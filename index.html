@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deep Sea Explorer</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; color: #fff; font-family: Arial, sans-serif; }
+        canvas { display: block; }
+        #info { position: absolute; top: 10px; left: 10px; padding: 10px; background-color: rgba(0,0,0,0.5); border-radius: 5px; }
+        #altitude, #speed { margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+    <canvas id="glCanvas"></canvas>
+    <div id="info">
+        <div id="altitude">Altitude: 0 m</div>
+        <div id="speed">Descent Speed: 5 km/h</div>
+    </div>
+    <script src="main.js"></script>
+</body>
+</html>
