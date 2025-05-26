@@ -147,9 +147,15 @@ let activeParticles = [];
 const PARTICLE_TYPE = { DUST: 0, BUBBLE: 1 };
 let particleShaderProgram;
 let particleVertexBufferGL; // VBO for a unit quad
-let aParticleQuadVertexLoc; // Attribute for quad corner
+let aParticleQuadVertexLoc; // Attribute for particle shader's a_particle_quad_vertex
 let uParticleWorldPosLoc, uParticleColorLoc, uParticleSizeLoc;
 let uParticleViewMatrixLoc, uParticleProjectionMatrixLoc; // For shader
+
+// Global Attribute Locations (as per subtask)
+let seaboxPositionAttributeLocation;
+let creaturePosAttrLoc; // For creature shader's a_creature_position
+// aCreatureVertexNormalLoc is already global (line 221 of previous file)
+// aParticleQuadVertexLoc is already global (line 156 of previous file)
 
 const DUST_COLOR = [0.8, 0.8, 0.7, 0.3]; // Semi-transparent greyish
 const BUBBLE_COLOR = [0.7, 0.8, 1.0, 0.2]; // Semi-transparent bluish
@@ -435,6 +441,10 @@ window.onload = async function() { // Make it async
     uBackgroundViewMatrixLoc = gl.getUniformLocation(backgroundShaderProgram, "u_viewMatrix");
     console.log('Background Uniform Locations (using backgroundShaderProgram):', { proj: uBackgroundProjectionMatrixLoc, view: uBackgroundViewMatrixLoc, depth: uBackgroundDepthLoc });
 
+    // Get and log Sebox Attribute Location
+    seaboxPositionAttributeLocation = gl.getAttribLocation(backgroundShaderProgram, "a_position");
+    console.log('Seabox Attrib Locations:', { a_position: seaboxPositionAttributeLocation });
+
 
     // Create and bind buffers for seabox
     seaboxVertexBuffer = gl.createBuffer();
@@ -480,8 +490,9 @@ window.onload = async function() { // Make it async
 
     // Get new attribute and uniform locations for creatureShaderProgram
     // Attributes:
-    // const creatureAttributeLocation = gl.getAttribLocation(creatureShaderProgram, "a_creature_position"); // This will be fetched in render or if used globally
+    creaturePosAttrLoc = gl.getAttribLocation(creatureShaderProgram, "a_creature_position");
     aCreatureVertexNormalLoc = gl.getAttribLocation(creatureShaderProgram, "a_vertex_normal");
+    console.log('Creature Attrib Locations:', { a_creature_position: creaturePosAttrLoc, a_vertex_normal: aCreatureVertexNormalLoc });
 
     // Uniforms for matrices:
     uCreatureModelMatrixLoc = gl.getUniformLocation(creatureShaderProgram, "u_modelMatrix");
@@ -524,6 +535,8 @@ window.onload = async function() { // Make it async
         if (!particleShaderProgram) { alert("Failed to init particle shaders."); return; }
 
         aParticleQuadVertexLoc = gl.getAttribLocation(particleShaderProgram, "a_particle_quad_vertex");
+        console.log('Particle Attrib Locations:', { a_particle_quad_vertex: aParticleQuadVertexLoc });
+        
         uParticleWorldPosLoc = gl.getUniformLocation(particleShaderProgram, "u_particle_world_pos");
         uParticleColorLoc = gl.getUniformLocation(particleShaderProgram, "u_particle_color");
         uParticleSizeLoc = gl.getUniformLocation(particleShaderProgram, "u_particle_size");
@@ -742,9 +755,11 @@ function render(timestamp) {
 
     // Bind seabox buffers
     gl.bindBuffer(gl.ARRAY_BUFFER, seaboxVertexBuffer);
-    const seaboxPositionAttributeLocation = gl.getAttribLocation(backgroundShaderProgram, "a_position"); // Use renamed
-    gl.enableVertexAttribArray(seaboxPositionAttributeLocation);
-    gl.vertexAttribPointer(seaboxPositionAttributeLocation, 3, gl.FLOAT, false, 0, 0); // 3 components for 3D
+    // const seaboxPositionAttributeLocation = gl.getAttribLocation(backgroundShaderProgram, "a_position"); // Now global
+    if (seaboxPositionAttributeLocation !== -1 && typeof seaboxPositionAttributeLocation !== 'undefined') { // Check if valid
+      gl.vertexAttribPointer(seaboxPositionAttributeLocation, 3, gl.FLOAT, false, 0, 0); // 3 components for 3D
+      gl.enableVertexAttribArray(seaboxPositionAttributeLocation);
+    }
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, seaboxIndexBuffer);
 
@@ -787,9 +802,11 @@ function render(timestamp) {
     gl.uniformMatrix4fv(uCreatureProjectionMatrixLoc, false, projectionMatrix);
 
     // Enable vertex attributes
-    const creaturePosAttrLoc = gl.getAttribLocation(creatureShaderProgram, "a_creature_position");
-    gl.enableVertexAttribArray(creaturePosAttrLoc);
-    if (aCreatureVertexNormalLoc !== -1 && aCreatureVertexNormalLoc !== null) { // Check if normal attribute exists
+    // const creaturePosAttrLoc = gl.getAttribLocation(creatureShaderProgram, "a_creature_position"); // Now global
+    if (creaturePosAttrLoc !== -1 && typeof creaturePosAttrLoc !== 'undefined') { // Check if valid before enabling
+        gl.enableVertexAttribArray(creaturePosAttrLoc);
+    }
+    if (aCreatureVertexNormalLoc !== -1 && typeof aCreatureVertexNormalLoc !== 'undefined') { // Check if normal attribute exists
       gl.enableVertexAttribArray(aCreatureVertexNormalLoc);
     }
 
@@ -821,9 +838,12 @@ function render(timestamp) {
         // 1. Set up buffers for this creature type (vertices, normals, indices)
         gl.bindBuffer(gl.ARRAY_BUFFER, creatureVertexBufferGL);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(creatureDef.vertices), gl.DYNAMIC_DRAW);
-        gl.vertexAttribPointer(creaturePosAttrLoc, 3, gl.FLOAT, false, 0, 0);
+        if (creaturePosAttrLoc !== -1 && typeof creaturePosAttrLoc !== 'undefined') {
+          gl.vertexAttribPointer(creaturePosAttrLoc, 3, gl.FLOAT, false, 0, 0);
+        }
 
-        if (aCreatureVertexNormalLoc !== -1 && aCreatureVertexNormalLoc !== null) {
+
+        if (aCreatureVertexNormalLoc !== -1 && typeof aCreatureVertexNormalLoc !== 'undefined') {
             gl.bindBuffer(gl.ARRAY_BUFFER, creatureNormalBufferGL);
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(creatureDef.normals), gl.DYNAMIC_DRAW);
             gl.vertexAttribPointer(aCreatureVertexNormalLoc, 3, gl.FLOAT, false, 0, 0);
@@ -892,14 +912,19 @@ function render(timestamp) {
         gl.uniform3fv(uCameraUpWsLoc, camUp);
 
         gl.bindBuffer(gl.ARRAY_BUFFER, particleVertexBufferGL);
-        gl.vertexAttribPointer(aParticleQuadVertexLoc, 2, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(aParticleQuadVertexLoc);
+        if (aParticleQuadVertexLoc !== -1 && typeof aParticleQuadVertexLoc !== 'undefined') { // Check if valid
+          gl.vertexAttribPointer(aParticleQuadVertexLoc, 2, gl.FLOAT, false, 0, 0);
+          gl.enableVertexAttribArray(aParticleQuadVertexLoc);
+        }
 
         for (const p of activeParticles) {
             gl.uniform3fv(uParticleWorldPosLoc, p.position);
             gl.uniform4fv(uParticleColorLoc, p.color);
             gl.uniform1f(uParticleSizeLoc, p.size);
-            gl.drawArrays(gl.TRIANGLES, 0, 6); // 6 vertices for 2 triangles (a quad)
+            // Only draw if the attribute was successfully set up
+            if (aParticleQuadVertexLoc !== -1 && typeof aParticleQuadVertexLoc !== 'undefined') {
+                 gl.drawArrays(gl.TRIANGLES, 0, 6); // 6 vertices for 2 triangles (a quad)
+            }
         }
         gl.depthMask(true);
         gl.disable(gl.BLEND);
