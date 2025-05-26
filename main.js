@@ -133,6 +133,59 @@ glMatrix.vec3 = {
         return out;
     }
 };
+
+glMatrix.quat = {
+  create: function() {
+    let out = new Float32Array(4);
+    out[0] = 0; out[1] = 0; out[2] = 0; out[3] = 1; // x, y, z, w
+    return out;
+  },
+  fromMat3: function(out, m) {
+    // Algorithm in Ken Shoemake's article in 1987 SIGGRAPH course notes
+    // article "Quaternion Calculus and Fast Animation".
+    let fTrace = m[0] + m[4] + m[8];
+    let fRoot;
+
+    if (fTrace > 0.0) {
+      // |w| > 1/2, may as well choose w > 1/2
+      fRoot = Math.sqrt(fTrace + 1.0); // 2w
+      out[3] = 0.5 * fRoot;
+      fRoot = 0.5 / fRoot; // 1/(4w)
+      out[0] = (m[5] - m[7]) * fRoot;
+      out[1] = (m[6] - m[2]) * fRoot;
+      out[2] = (m[1] - m[3]) * fRoot;
+    } else {
+      // |w| <= 1/2
+      let i = 0;
+      if (m[4] > m[0]) i = 1;
+      if (m[8] > m[i * 3 + i]) i = 2;
+      let j = (i + 1) % 3;
+      let k = (i + 2) % 3;
+
+      fRoot = Math.sqrt(m[i * 3 + i] - m[j * 3 + j] - m[k * 3 + k] + 1.0);
+      out[i] = 0.5 * fRoot;
+      fRoot = 0.5 / fRoot;
+      out[3] = (m[j * 3 + k] - m[k * 3 + j]) * fRoot;
+      out[j] = (m[j * 3 + i] + m[i * 3 + j]) * fRoot;
+      out[k] = (m[k * 3 + i] + m[i * 3 + k]) * fRoot;
+    }
+    return out;
+  },
+  // Minimal rotateX for mat4.fromRotationTranslation
+  // Simplified for mat4.rotateX directly on mat4 if needed
+};
+
+glMatrix.mat3 = { // Required for quat.fromMat3 if using mat3 intermediate
+    create: function() {
+        let out = new Float32Array(9);
+        out[0] = 1; out[1] = 0; out[2] = 0;
+        out[3] = 0; out[4] = 1; out[5] = 0;
+        out[6] = 0; out[7] = 0; out[8] = 1;
+        return out;
+    }
+};
+
+
 // End of Embedded gl-matrix functions
 
 // main.js
@@ -156,6 +209,38 @@ let seaboxPositionAttributeLocation;
 let creaturePosAttrLoc; // For creature shader's a_creature_position
 // aCreatureVertexNormalLoc is already global (line 221 of previous file)
 // aParticleQuadVertexLoc is already global (line 156 of previous file)
+
+// Framebuffer Object (FBO) for Occlusion Texture (Flashlight Spot)
+let occlusionFBO;
+let occlusionTexture;
+let lightSpotShaderProgram; // For rendering the flashlight spot into the occlusion texture
+let uLightSpot_ViewProjectionMatrixLoc; // For positioning the spot (added as per prompt)
+let uLightSpot_ColorLoc; // For spot color/intensity
+let uLightSpot_AspectRatioLoc; // For shaping the spot
+let lightSpotQuadVBO; // VBO for a simple quad
+
+// God Ray Shader Global Variables
+let godRayShaderProgram;
+let uOcclusionTextureLoc, uLightScreenPosLoc;
+let uGodRayNumSamplesLoc, uGodRayDecayLoc, uGodRayExposureLoc, uGodRayDensityLoc, uGodRayWeightLoc; // New uniform locations
+// We can reuse lightSpotQuadVBO for the fullscreen quad
+
+const godRayParams = { // Default values for god ray parameters
+    numSamples: 64, // Integer
+    decay: 0.96,
+    exposure: 0.15,
+    density: 0.9,
+    weight: 0.1
+};
+
+// Flashlight Model Global Variables
+let flashlightModel = {
+    vertices: [],
+    normals: [],
+    indices: []
+};
+let flashlightVertexBufferGL, flashlightNormalBufferGL, flashlightIndexBufferGL;
+const FLASHLIGHT_MODEL_COLOR = [0.25, 0.25, 0.3, 1.0]; // Dark greyish color
 
 const DUST_COLOR = [0.8, 0.8, 0.7, 0.3]; // Semi-transparent greyish
 const BUBBLE_COLOR = [0.7, 0.8, 1.0, 0.2]; // Semi-transparent bluish
@@ -305,6 +390,58 @@ function initShaderProgram(gl, vsSource, fsSource) {
         return null;
     }
     return shaderProgram;
+}
+
+function generateCylinder(radius, height, segments) {
+    let vertices = []; let normals = []; let indices = [];
+    const halfHeight = height / 2;
+
+    // Side vertices and normals
+    for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        const x = Math.cos(angle) * radius; 
+        const z = Math.sin(angle) * radius;
+        vertices.push(x, halfHeight, z); normals.push(x/radius, 0, z/radius);
+        vertices.push(x, -halfHeight, z); normals.push(x/radius, 0, z/radius);
+    }
+    // Side indices
+    for (let i = 0; i < segments; i++) {
+        const p1 = i * 2;     const p2 = i * 2 + 1;
+        const p3 = (i + 1) * 2; const p4 = (i + 1) * 2 + 1;
+        indices.push(p1, p2, p3);
+        indices.push(p3, p2, p4);
+    }
+
+    // Caps
+    const capVertexBaseIndex = vertices.length / 3; 
+
+    // Top Cap
+    vertices.push(0, halfHeight, 0); 
+    normals.push(0, 1, 0);
+    const topCenterIdx = capVertexBaseIndex;
+    for (let i = 0; i <= segments; i++) { 
+        const angle = (i / segments) * Math.PI * 2;
+        const x = Math.cos(angle) * radius; const z = Math.sin(angle) * radius;
+        vertices.push(x, halfHeight, z); normals.push(0, 1, 0);
+    }
+    for (let i = 0; i < segments; i++) {
+        indices.push(topCenterIdx, capVertexBaseIndex + 1 + i, capVertexBaseIndex + 1 + i + 1);
+    }
+
+    // Bottom Cap
+    const bottomCapBaseIndex = vertices.length / 3; 
+    vertices.push(0, -halfHeight, 0); 
+    normals.push(0, -1, 0);
+    const bottomCenterIdx = bottomCapBaseIndex;
+    for (let i = 0; i <= segments; i++) { 
+        const angle = (i / segments) * Math.PI * 2;
+        const x = Math.cos(angle) * radius; const z = Math.sin(angle) * radius;
+        vertices.push(x, -halfHeight, z); normals.push(0, -1, 0);
+    }
+    for (let i = 0; i < segments; i++) {
+        indices.push(bottomCenterIdx, bottomCapBaseIndex + 1 + i + 1, bottomCapBaseIndex + 1 + i); 
+    }
+    return { vertices, normals, indices };
 }
 
 // Creature Definitions
@@ -532,6 +669,21 @@ window.onload = async function() { // Make it async
     uFlashlightConeCosLoc = gl.getUniformLocation(creatureShaderProgram, "u_flashlightConeCos");
     uFlashlightOuterConeCosLoc = gl.getUniformLocation(creatureShaderProgram, "u_flashlightOuterConeCos");
 
+    // Initialize Flashlight Model
+    flashlightModel = generateCylinder(1.0, 1.0, 16); // Unit cylinder (radius 1, height 1)
+
+    flashlightVertexBufferGL = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, flashlightVertexBufferGL);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flashlightModel.vertices), gl.STATIC_DRAW);
+
+    flashlightNormalBufferGL = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, flashlightNormalBufferGL);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flashlightModel.normals), gl.STATIC_DRAW);
+
+    flashlightIndexBufferGL = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, flashlightIndexBufferGL);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(flashlightModel.indices), gl.STATIC_DRAW);
+
     // Basic clear color - might be overridden by shader but good for initial setup
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -584,6 +736,147 @@ window.onload = async function() { // Make it async
     lastSpawnDepth = currentAltitude; // Initialize lastSpawnDepth
 
     console.log("WebGL initialized, shaders compiled, and background quad set up.");
+
+    // --- Initialize FBO, Occlusion Texture, Light Spot Shader, and VBO ---
+    occlusionFBO = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, occlusionFBO);
+
+    occlusionTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, occlusionTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, occlusionTexture, 0);
+
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+        console.error("Framebuffer setup failed: " + gl.checkFramebufferStatus(gl.FRAMEBUFFER));
+        alert("Error: Framebuffer setup failed for post-processing.");
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    const lightSpotVS = `
+        attribute vec2 a_quad_pos;
+        uniform mat4 u_viewProjectionMatrix; // Though not used for fullscreen screen-space
+        varying vec2 v_texCoord;
+        void main() {
+            gl_Position = vec4(a_quad_pos, 0.0, 1.0); // Fullscreen quad
+            v_texCoord = a_quad_pos * 0.5 + 0.5;
+        }`;
+    const lightSpotFS = `
+        precision mediump float;
+        varying vec2 v_texCoord;
+        uniform vec3 u_light_spot_color;
+        uniform float u_aspect_ratio;
+        void main() {
+            vec2 centered_coord = v_texCoord - vec2(0.5);
+            centered_coord.x *= u_aspect_ratio;
+            float dist = length(centered_coord);
+            float intensity = smoothstep(0.4, 0.05, dist);
+            gl_FragColor = vec4(u_light_spot_color * intensity, 1.0);
+        }`;
+    lightSpotShaderProgram = initShaderProgram(gl, lightSpotVS, lightSpotFS);
+    if (lightSpotShaderProgram) {
+        uLightSpot_ViewProjectionMatrixLoc = gl.getUniformLocation(lightSpotShaderProgram, "u_viewProjectionMatrix"); // Added fetch
+        uLightSpot_ColorLoc = gl.getUniformLocation(lightSpotShaderProgram, "u_light_spot_color");
+        uLightSpot_AspectRatioLoc = gl.getUniformLocation(lightSpotShaderProgram, "u_aspect_ratio");
+        console.log("Light Spot Shader Program and uniforms initialized.");
+    } else {
+        console.error("Failed to initialize Light Spot Shader Program.");
+    }
+
+    const quadVertices = [-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1];
+    lightSpotQuadVBO = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, lightSpotQuadVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quadVertices), gl.STATIC_DRAW);
+    // --- End FBO and Light Spot Shader Init ---
+
+
+    // --- Initialize FBO, Occlusion Texture, Light Spot Shader, and VBO ---
+    occlusionFBO = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, occlusionFBO);
+
+    occlusionTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, occlusionTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, occlusionTexture, 0);
+
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+        console.error("Framebuffer setup failed: " + gl.checkFramebufferStatus(gl.FRAMEBUFFER));
+        alert("Error: Framebuffer setup failed for post-processing.");
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); // Unbind FBO
+
+    // Simple shader for drawing the light spot
+    const lightSpotVS = `
+        attribute vec2 a_quad_pos; // Simple quad -1 to 1
+        uniform mat4 u_viewProjectionMatrix; // To place the spot in the world (if needed)
+                                            // Or just use it for screen space quad if spot is screen-aligned
+        varying vec2 v_texCoord;
+        void main() {
+            gl_Position = vec4(a_quad_pos, 0.0, 1.0); // Fullscreen quad for screen-space spot
+            v_texCoord = a_quad_pos * 0.5 + 0.5; // Convert -1..1 to 0..1
+        }`;
+    const lightSpotFS = `
+        precision mediump float;
+        varying vec2 v_texCoord;
+        uniform vec3 u_light_spot_color; // Color of the spot
+        uniform float u_aspect_ratio;    // canvas.width / canvas.height
+        void main() {
+            vec2 centered_coord = v_texCoord - vec2(0.5); // -0.5 to 0.5
+            centered_coord.x *= u_aspect_ratio; // Correct for aspect ratio to make circle round
+            float dist = length(centered_coord);
+            float intensity = smoothstep(0.4, 0.05, dist); // Soft circular spot
+            gl_FragColor = vec4(u_light_spot_color * intensity, 1.0);
+        }`;
+    lightSpotShaderProgram = initShaderProgram(gl, lightSpotVS, lightSpotFS);
+    if (lightSpotShaderProgram) {
+        uLightSpot_ViewProjectionMatrixLoc = gl.getUniformLocation(lightSpotShaderProgram, "u_viewProjectionMatrix");
+        uLightSpot_ColorLoc = gl.getUniformLocation(lightSpotShaderProgram, "u_light_spot_color");
+        uLightSpot_AspectRatioLoc = gl.getUniformLocation(lightSpotShaderProgram, "u_aspect_ratio");
+        console.log("Light Spot Shader Program and uniforms initialized: ", {vp: uLightSpot_ViewProjectionMatrixLoc, color: uLightSpot_ColorLoc, aspect: uLightSpot_AspectRatioLoc});
+    } else {
+        console.error("Failed to initialize Light Spot Shader Program.");
+    }
+
+    // VBO for a fullscreen quad (used by light spot shader and later god ray shader)
+    const quadVertices = [-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1];
+    lightSpotQuadVBO = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, lightSpotQuadVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quadVertices), gl.STATIC_DRAW);
+    // --- End FBO and Light Spot Shader Init ---
+
+    // --- Initialize God Ray Shader Program ---
+    try {
+        const godRayVS_src = await fetch('godray-vertex-shader.glsl').then(res => res.text());
+        const godRayFS_src = await fetch('godray-fragment-shader.glsl').then(res => res.text());
+        godRayShaderProgram = initShaderProgram(gl, godRayVS_src, godRayFS_src);
+        if (!godRayShaderProgram) { alert("Failed to init god ray shaders."); }
+        else {
+            uOcclusionTextureLoc = gl.getUniformLocation(godRayShaderProgram, "u_occlusionTexture");
+            uLightScreenPosLoc = gl.getUniformLocation(godRayShaderProgram, "u_lightScreenPos");
+            uGodRayNumSamplesLoc = gl.getUniformLocation(godRayShaderProgram, "u_num_samples");
+            uGodRayDecayLoc = gl.getUniformLocation(godRayShaderProgram, "u_decay");
+            uGodRayExposureLoc = gl.getUniformLocation(godRayShaderProgram, "u_exposure");
+            uGodRayDensityLoc = gl.getUniformLocation(godRayShaderProgram, "u_density");
+            uGodRayWeightLoc = gl.getUniformLocation(godRayShaderProgram, "u_weight");
+            console.log('GodRay Shader Uniforms:', { 
+                u_occlusionTexture: uOcclusionTextureLoc, 
+                u_lightScreenPos: uLightScreenPosLoc,
+                numSamples: uGodRayNumSamplesLoc, 
+                decay: uGodRayDecayLoc, 
+                exposure: uGodRayExposureLoc, 
+                density: uGodRayDensityLoc, 
+                weight: uGodRayWeightLoc 
+            });
+        }
+    } catch (error) { console.error("God Ray shader fetch error:", error); }
+    // --- End God Ray Shader Program Init ---
 
     // --- Mouse Click Listener for Flashlight and Pointer Lock ---
     canvas.addEventListener('click', function(event) {
@@ -711,6 +1004,43 @@ function spawnCreature() {
 }
 
 function render(timestamp) {
+    // In render function, at the very beginning:
+    if (isFlashlightOn && occlusionFBO && lightSpotShaderProgram && lightSpotQuadVBO && uLightSpot_ColorLoc && uLightSpot_AspectRatioLoc) { // Check all required components
+        gl.bindFramebuffer(gl.FRAMEBUFFER, occlusionFBO);
+        // The viewport for the FBO should match the occlusionTexture dimensions, which are canvas.width/height
+        gl.viewport(0, 0, canvas.width, canvas.height); 
+        
+        gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear occlusion texture to black
+        gl.clear(gl.COLOR_BUFFER_BIT); // Only need to clear color, depth not used for this texture
+
+        gl.useProgram(lightSpotShaderProgram);
+
+        // Set uniforms for the light spot shader
+        gl.uniform3fv(uLightSpot_ColorLoc, [1.0, 1.0, 0.9]); // Bright spot color
+        gl.uniform1f(uLightSpot_AspectRatioLoc, canvas.width / canvas.height);
+
+        const quadPosLoc = gl.getAttribLocation(lightSpotShaderProgram, "a_quad_pos");
+        if (quadPosLoc !== -1) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, lightSpotQuadVBO);
+            gl.vertexAttribPointer(quadPosLoc, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(quadPosLoc);
+            gl.drawArrays(gl.TRIANGLES, 0, 6); // Draw fullscreen quad for the spot
+            gl.disableVertexAttribArray(quadPosLoc); 
+        }
+        
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null); // Unbind FBO, back to default framebuffer for main scene rendering
+        // Reset viewport to draw to the main canvas (if it was different, though here it's the same)
+        // gl.viewport(0, 0, gl.canvas.width, gl.canvas.height); // Not strictly needed if FBO viewport was full canvas
+    } else if (occlusionFBO) { // If flashlight is off, but FBO exists
+        // Ensure occlusion texture is cleared to black
+        gl.bindFramebuffer(gl.FRAMEBUFFER, occlusionFBO);
+        gl.viewport(0, 0, canvas.width, canvas.height); // Match texture dimensions
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+
+    // ... rest of the existing render function (main canvas clearing, seabox, creatures, particles, etc.)
     const deltaTime = (timestamp - lastTimestamp) / 1000;
     lastTimestamp = timestamp;
 
@@ -952,6 +1282,176 @@ function render(timestamp) {
         // gl.disableVertexAttribArray(aParticleQuadVertexLoc); // Optional: if it interferes with other shaders
     }
 
+    // --- Render Flashlight Model ---
+    if (isFlashlightOn) {
+        gl.useProgram(creatureShaderProgram); 
+
+        // Set up for additive blending
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE); // Additive blending (source + destination)
+        // gl.depthMask(false); // God rays typically don't write to depth
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, occlusionTexture);
+        gl.uniform1i(uOcclusionTextureLoc, 0); // Texture unit 0
+
+        // Light position on screen (center for now, as light spot is screen-centered)
+        gl.uniform2f(uLightScreenPosLoc, 0.5, 0.5); 
+
+        // Set new god ray parameter uniforms
+        if(uGodRayNumSamplesLoc) gl.uniform1i(uGodRayNumSamplesLoc, godRayParams.numSamples);
+        if(uGodRayDecayLoc) gl.uniform1f(uGodRayDecayLoc, godRayParams.decay);
+        if(uGodRayExposureLoc) gl.uniform1f(uGodRayExposureLoc, godRayParams.exposure);
+        if(uGodRayDensityLoc) gl.uniform1f(uGodRayDensityLoc, godRayParams.density);
+        if(uGodRayWeightLoc) gl.uniform1f(uGodRayWeightLoc, godRayParams.weight);
+
+        const godRayQuadPosLoc = gl.getAttribLocation(godRayShaderProgram, "a_quad_pos");
+        if (godRayQuadPosLoc !== -1) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, lightSpotQuadVBO); // Reuse quad VBO
+            gl.vertexAttribPointer(godRayQuadPosLoc, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(godRayQuadPosLoc);
+            
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            
+            gl.disableVertexAttribArray(godRayQuadPosLoc);
+        }
+        
+        gl.disable(gl.BLEND); // Reset blend mode
+        // gl.depthMask(true); // Reset depth mask if it was changed
+    }
+
+    // --- God Ray Rendering Pass (moved after flashlight model) ---
+    if (isFlashlightOn && godRayShaderProgram && occlusionTexture && uOcclusionTextureLoc && uLightScreenPosLoc) {
+        gl.useProgram(godRayShaderProgram);
+
+        // Set all necessary uniforms for creatureShaderProgram
+        gl.uniformMatrix4fv(uCreatureViewMatrixLoc, false, viewMatrix);
+        gl.uniformMatrix4fv(uCreatureProjectionMatrixLoc, false, projectionMatrix);
+        gl.uniform3fv(uCameraPositionLoc, cameraPosition);
+        gl.uniform3fv(uLightPositionLoc, lightPosition); 
+        gl.uniform3fv(uLightColorLoc, lightColor);    
+        gl.uniform3fv(uAmbientColorLoc, ambientLightColor); 
+        gl.uniform1f(uMaterialShininessLoc, 16.0); 
+
+        gl.uniform1i(uIsFlashlightOnLoc, isFlashlightOn ? 1 : 0);
+        
+        // Recalculate currentForwardVec for flashlight direction (already done above for cameraTarget)
+        let currentForwardVec = glMatrix.vec3.create(); 
+        currentForwardVec[0] = Math.cos(cameraPitch) * Math.cos(cameraYaw);
+        currentForwardVec[1] = Math.sin(cameraPitch);
+        currentForwardVec[2] = Math.cos(cameraPitch) * Math.sin(cameraYaw);
+        glMatrix.vec3.normalize(currentForwardVec, currentForwardVec);
+
+        if (uFlashlightPosLoc) gl.uniform3fv(uFlashlightPosLoc, cameraPosition);
+        if (uFlashlightDirLoc) gl.uniform3fv(uFlashlightDirLoc, currentForwardVec); 
+        if (uFlashlightColorLoc) gl.uniform3fv(uFlashlightColorLoc, flashlightColor);
+        if (uFlashlightIntensityLoc) gl.uniform1f(uFlashlightIntensityLoc, flashlightIntensity);
+        if (uFlashlightConeCosLoc) gl.uniform1f(uFlashlightConeCosLoc, Math.cos(flashlightConeAngle));
+        if (uFlashlightOuterConeCosLoc) gl.uniform1f(uFlashlightOuterConeCosLoc, Math.cos(flashlightOuterConeAngle));
+
+        // Flashlight Model Attributes Setup
+        if (creaturePosAttrLoc !== -1 && typeof creaturePosAttrLoc !== 'undefined') { 
+            gl.bindBuffer(gl.ARRAY_BUFFER, flashlightVertexBufferGL);
+            gl.vertexAttribPointer(creaturePosAttrLoc, 3, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(creaturePosAttrLoc);
+        }
+        if (aCreatureVertexNormalLoc !== -1 && typeof aCreatureVertexNormalLoc !== 'undefined') {
+            gl.bindBuffer(gl.ARRAY_BUFFER, flashlightNormalBufferGL);
+            gl.vertexAttribPointer(aCreatureVertexNormalLoc, 3, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(aCreatureVertexNormalLoc);
+        }
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, flashlightIndexBufferGL);
+
+        // Construct Model Matrix for the flashlight
+        let flashlightModelMatrix = glMatrix.mat4.create();
+        let camQuat = glMatrix.quat.create(); 
+        let camRotationMat3 = glMatrix.mat3.create(); // Temp mat3 for quat conversion
+        let camActualRight = glMatrix.vec3.create();
+        let camActualUp = glMatrix.vec3.create();
+
+        // Re-calculate right and up vectors based on currentForwardVec and global upVector
+        glMatrix.vec3.cross(camActualRight, currentForwardVec, upVector); 
+        glMatrix.vec3.normalize(camActualRight, camActualRight);
+        glMatrix.vec3.cross(camActualUp, camActualRight, currentForwardVec); // up = right x forward (adjust if needed)
+        glMatrix.vec3.normalize(camActualUp, camActualUp); // Ensure it's normalized
+        
+        // Construct column-major rotation matrix from basis vectors for glMatrix.quat.fromMat3
+        // Assuming currentForwardVec is the Z-axis of the camera's local space (points out of screen)
+        // The flashlight model's "forward" should align with this.
+        // If cylinder's main axis is Y, we'll rotate it.
+        // Basis vectors for rotation matrix (columns): Right, Up, -Forward (because GL is right-handed, +Z often comes out of screen)
+        camRotationMat3[0] = camActualRight[0]; camRotationMat3[1] = camActualRight[1]; camRotationMat3[2] = camActualRight[2];
+        camRotationMat3[3] = camActualUp[0];    camRotationMat3[4] = camActualUp[1];    camRotationMat3[5] = camActualUp[2];
+        camRotationMat3[6] = -currentForwardVec[0]; camRotationMat3[7] = -currentForwardVec[1]; camRotationMat3[8] = -currentForwardVec[2];
+        glMatrix.quat.fromMat3(camQuat, camRotationMat3);
+
+
+        const offsetRightVal = 0.15; const offsetDownVal = 0.10; const offsetForwardVal = 0.25;
+        let finalFlashlightPos = glMatrix.vec3.clone(cameraPosition);
+        glMatrix.vec3.scaleAndAdd(finalFlashlightPos, finalFlashlightPos, camActualRight, offsetRightVal);
+        glMatrix.vec3.scaleAndAdd(finalFlashlightPos, finalFlashlightPos, camActualUp, -offsetDownVal); 
+        glMatrix.vec3.scaleAndAdd(finalFlashlightPos, finalFlashlightPos, currentForwardVec, offsetForwardVal);
+
+        glMatrix.mat4.fromRotationTranslation(flashlightModelMatrix, camQuat, finalFlashlightPos);
+        
+        // The cylinder is generated with its height along Y. We want it to point along Z (forward).
+        // So, rotate it by -90 degrees around X-axis.
+        // Or, if we want it to align with the `currentForwardVec` which is camera's Z,
+        // we need to ensure the cylinder's original orientation is considered.
+        // Let's assume the cylinder's length is along its Y axis. We want to align this Y with camera's Z.
+        // This means we need a rotation that maps Y-axis to Z-axis.
+        // A common way is to rotate -PI/2 around X axis if cylinder's length is Y and we want it to point along Z.
+        let rotationX = glMatrix.mat4.create();
+        glMatrix.mat4.rotateX(rotationX, rotationX, -Math.PI / 2);
+        glMatrix.mat4.multiply(flashlightModelMatrix, flashlightModelMatrix, rotationX);
+
+        glMatrix.mat4.scale(flashlightModelMatrix, flashlightModelMatrix, [0.020, 0.15, 0.020]); // XZ radius, Y length (now points forward)
+
+        gl.uniformMatrix4fv(uCreatureModelMatrixLoc, false, flashlightModelMatrix);
+        gl.uniform3fv(uMaterialDiffuseColorLoc, FLASHLIGHT_MODEL_COLOR.slice(0,3));
+
+        gl.drawElements(gl.TRIANGLES, flashlightModel.indices.length, gl.UNSIGNED_SHORT, 0);
+
+        // Disable attributes after use if they were enabled specifically for this model
+        if (creaturePosAttrLoc !== -1 && typeof creaturePosAttrLoc !== 'undefined') {
+             gl.disableVertexAttribArray(creaturePosAttrLoc);
+        }
+        if (aCreatureVertexNormalLoc !== -1 && typeof aCreatureVertexNormalLoc !== 'undefined') {
+             gl.disableVertexAttribArray(aCreatureVertexNormalLoc);
+        }
+    }
+    
+    // --- God Ray Rendering Pass (This is the new location) ---
+    if (isFlashlightOn && godRayShaderProgram && occlusionTexture && uOcclusionTextureLoc && uLightScreenPosLoc) {
+        gl.useProgram(godRayShaderProgram);
+
+        // Set up for additive blending
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE); // Additive blending (source + destination)
+        // gl.depthMask(false); // God rays typically don't write to depth
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, occlusionTexture);
+        gl.uniform1i(uOcclusionTextureLoc, 0); // Texture unit 0
+
+        // Light position on screen (center for now, as light spot is screen-centered)
+        gl.uniform2f(uLightScreenPosLoc, 0.5, 0.5); 
+
+        const godRayQuadPosLoc = gl.getAttribLocation(godRayShaderProgram, "a_quad_pos");
+        if (godRayQuadPosLoc !== -1) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, lightSpotQuadVBO); // Reuse quad VBO
+            gl.vertexAttribPointer(godRayQuadPosLoc, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(godRayQuadPosLoc);
+            
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            
+            gl.disableVertexAttribArray(godRayQuadPosLoc);
+        }
+        
+        gl.disable(gl.BLEND); // Reset blend mode
+        // gl.depthMask(true); // Reset depth mask if it was changed
+    }
+
     requestAnimationFrame(render);
 }
 
@@ -966,3 +1466,38 @@ window.onresize = function() {
         console.log("Resized canvas and updated 3D projection matrix.");
     }
 };
+
+// Helper for mat4.fromRotationTranslation (if not in embedded glMatrix)
+if (glMatrix.mat4 && !glMatrix.mat4.fromRotationTranslation) {
+    glMatrix.mat4.fromRotationTranslation = function(out, q, v) {
+        // Quaternion math
+        let x = q[0], y = q[1], z = q[2], w = q[3];
+        let x2 = x + x, y2 = y + y, z2 = z + z;
+        let xx = x * x2, yx = y * x2, yy = y * y2;
+        let zx = z * x2, zy = z * y2, zz = z * z2;
+        let wx = w * x2, wy = w * y2, wz = w * z2;
+
+        out[0] = 1 - (yy + zz); out[1] = yx + wz; out[2] = zx - wy; out[3] = 0;
+        out[4] = yx - wz; out[5] = 1 - (xx + zz); out[6] = zy + wx; out[7] = 0;
+        out[8] = zx + wy; out[9] = zy - wx; out[10] = 1 - (xx + yy); out[11] = 0;
+        out[12] = v[0]; out[13] = v[1]; out[14] = v[2]; out[15] = 1;
+        return out;
+    };
+}
+// Helper for mat4.rotateX (if not in embedded glMatrix)
+if (glMatrix.mat4 && !glMatrix.mat4.rotateX) {
+    glMatrix.mat4.rotateX = function(out, a, rad) {
+        let s = Math.sin(rad), c = Math.cos(rad);
+        let a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7];
+        let a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11];
+        if (a !== out) { // If the source and destination differ, copy the unchanged rows
+            out[0] = a[0]; out[1] = a[1]; out[2] = a[2]; out[3] = a[3];
+            out[12] = a[12]; out[13] = a[13]; out[14] = a[14]; out[15] = a[15];
+        }
+        out[4] = a10 * c + a20 * s; out[5] = a11 * c + a21 * s;
+        out[6] = a12 * c + a22 * s; out[7] = a13 * c + a23 * s;
+        out[8] = a20 * c - a10 * s; out[9] = a21 * c - a11 * s;
+        out[10] = a22 * c - a12 * s; out[11] = a23 * c - a13 * s;
+        return out;
+    };
+}
