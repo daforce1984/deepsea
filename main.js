@@ -204,7 +204,8 @@ const zFar = 10000.0; // Increased zFar for large underwater scenes
 // Background Shader Uniform Locations
 let uBackgroundProjectionMatrixLoc;
 let uBackgroundViewMatrixLoc;
-let uBackgroundDepthLoc; // Specific for background shader's u_depth uniform
+let uBackgroundDepthLoc; // Specific for background shader's u_depth uniform (old, for normalized depth)
+let uActualDepthMetersLoc; // New uniform for actual depth in meters
 
 let seaboxVertexBuffer;
 const seaboxVertices = [
@@ -439,7 +440,15 @@ window.onload = async function() { // Make it async
     uBackgroundDepthLoc = gl.getUniformLocation(backgroundShaderProgram, "u_depth"); // This assigns to the global uBackgroundDepthLoc
     uBackgroundProjectionMatrixLoc = gl.getUniformLocation(backgroundShaderProgram, "u_projectionMatrix");
     uBackgroundViewMatrixLoc = gl.getUniformLocation(backgroundShaderProgram, "u_viewMatrix");
-    console.log('Background Uniform Locations (using backgroundShaderProgram):', { proj: uBackgroundProjectionMatrixLoc, view: uBackgroundViewMatrixLoc, depth: uBackgroundDepthLoc });
+    uBackgroundDepthLoc = gl.getUniformLocation(backgroundShaderProgram, "u_depth"); // Keep for now if any other shader might use it, or remove if truly unused.
+    uActualDepthMetersLoc = gl.getUniformLocation(backgroundShaderProgram, "u_actualDepthMeters"); // Get new uniform location
+
+    console.log('Background Uniform Locations:', { 
+        proj: uBackgroundProjectionMatrixLoc, 
+        view: uBackgroundViewMatrixLoc, 
+        depth_normalized: uBackgroundDepthLoc, // This was for the old u_depth
+        actual_depth_meters: uActualDepthMetersLoc 
+    });
 
     // Get and log Sebox Attribute Location
     seaboxPositionAttributeLocation = gl.getAttribLocation(backgroundShaderProgram, "a_position");
@@ -725,7 +734,9 @@ function render(timestamp) {
     }
 
     if (altitudeDisplay) {
-        altitudeDisplay.textContent = `Altitude: ${Math.round(currentAltitude)} m`;
+        // Display depth as a positive value. cameraPosition[1] is negative during descent.
+        let depthValue = Math.abs(Math.round(cameraPosition[1]));
+        altitudeDisplay.textContent = `Depth: ${depthValue} m`;
     }
 
     // Check for spawning new creatures
@@ -748,10 +759,20 @@ function render(timestamp) {
     gl.uniformMatrix4fv(uBackgroundProjectionMatrixLoc, false, projectionMatrix); // Uses global
     gl.uniformMatrix4fv(uBackgroundViewMatrixLoc, false, viewMatrix); // Uses global
 
-    // Normalized depth for color calculation (same as before for fragment shader)
-    const normalizedDepth = Math.min(Math.abs(currentAltitude) / MAX_DEPTH_FOR_COLOR_TRANSITION, 1.0);
-    gl.uniform1f(uBackgroundDepthLoc, normalizedDepth); // Uses global
-    // uResolution is not directly used by the updated background shaders but uBackgroundDepthLoc is.
+    // REMOVE/COMMENT OUT old normalized depth logic for background shader:
+    // const normalizedDepth = Math.min(Math.abs(currentAltitude) / MAX_DEPTH_FOR_COLOR_TRANSITION, 1.0);
+    // if (uBackgroundDepthLoc !== null && typeof uBackgroundDepthLoc !== 'undefined' && uBackgroundDepthLoc !== -1) { // Check if it was found
+    //    gl.uniform1f(uBackgroundDepthLoc, normalizedDepth); 
+    // }
+
+    // ADD new actual depth uniform for background shader:
+    if (uActualDepthMetersLoc !== null && typeof uActualDepthMetersLoc !== 'undefined' && uActualDepthMetersLoc !== -1) { // Check if it was found
+        gl.uniform1f(uActualDepthMetersLoc, Math.abs(cameraPosition[1]));
+    } else {
+        // This indicates an issue if the uniform isn't found, though the console.log in onload should catch it first.
+        // console.error("u_actualDepthMetersLoc not found for background shader");
+    }
+    // uResolution is not directly used by the updated background shaders.
 
     // Bind seabox buffers
     gl.bindBuffer(gl.ARRAY_BUFFER, seaboxVertexBuffer);
