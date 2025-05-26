@@ -195,6 +195,11 @@ let aspect; // Calculated in window.onload or resize
 const zNear = 0.1;
 const zFar = 10000.0; // Increased zFar for large underwater scenes
 
+// Background Shader Uniform Locations
+let uBackgroundProjectionMatrixLoc;
+let uBackgroundViewMatrixLoc;
+let uBackgroundDepthLoc; // Specific for background shader's u_depth uniform
+
 let seaboxVertexBuffer;
 const seaboxVertices = [
     // Front face
@@ -238,10 +243,10 @@ const seaboxIndices = [
 ];
 let seaboxIndexBuffer;
 
-let shaderProgram;
-let positionBuffer;
-let uResolutionLocation;
-let uDepthLocation;
+let backgroundShaderProgram; // Renamed from shaderProgram
+let positionBuffer; // This was for the old 2D quad, potentially unused
+let uResolutionLocation; // Still used by background fragment shader for u_depth calc
+let uDepthLocation; // This is the OLD global uDepthLocation, ensure it's correctly handled or removed if replaced by uBackgroundDepthLoc
 const MAX_DEPTH_FOR_COLOR_TRANSITION = 4000; // meters for full darkness
 
 let creatureShaderProgram;
@@ -416,18 +421,19 @@ window.onload = async function() { // Make it async
         return;
     }
 
-    shaderProgram = initShaderProgram(gl, vsSource, fsSource);
-    if (!shaderProgram) {
-        alert("Failed to initialize shader program.");
+    backgroundShaderProgram = initShaderProgram(gl, vsSource, fsSource); // Renamed
+    if (!backgroundShaderProgram) { // Renamed
+        alert("Failed to initialize background shader program."); // Updated message
         return;
     }
-    gl.useProgram(shaderProgram); // Use the program
+    gl.useProgram(backgroundShaderProgram); // Use the renamed program
 
-    // Get uniform locations for background shader (shaderProgram)
-    uResolutionLocation = gl.getUniformLocation(shaderProgram, "u_resolution"); // Still needed for u_depth calculation logic in fragment shader
-    uDepthLocation = gl.getUniformLocation(shaderProgram, "u_depth");
-    const uBackgroundProjectionMatrixLoc = gl.getUniformLocation(shaderProgram, "u_projectionMatrix");
-    const uBackgroundViewMatrixLoc = gl.getUniformLocation(shaderProgram, "u_viewMatrix");
+    // Get uniform locations for background shader (backgroundShaderProgram)
+    uResolutionLocation = gl.getUniformLocation(backgroundShaderProgram, "u_resolution");
+    uBackgroundDepthLoc = gl.getUniformLocation(backgroundShaderProgram, "u_depth"); // This assigns to the global uBackgroundDepthLoc
+    uBackgroundProjectionMatrixLoc = gl.getUniformLocation(backgroundShaderProgram, "u_projectionMatrix");
+    uBackgroundViewMatrixLoc = gl.getUniformLocation(backgroundShaderProgram, "u_viewMatrix");
+    console.log('Background Uniform Locations (using backgroundShaderProgram):', { proj: uBackgroundProjectionMatrixLoc, view: uBackgroundViewMatrixLoc, depth: uBackgroundDepthLoc });
 
 
     // Create and bind buffers for seabox
@@ -440,7 +446,7 @@ window.onload = async function() { // Make it async
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(seaboxIndices), gl.STATIC_DRAW);
     
     // The old positionBuffer and its setup for the 2D quad are no longer needed for the background.
-    // The attribute a_position for shaderProgram will be set up in the render loop for the seabox.
+    // The attribute a_position for backgroundShaderProgram will be set up in the render loop for the seabox.
 
     // Load and compile creature shaders
     try {
@@ -723,20 +729,20 @@ function render(timestamp) {
 
     // --- Render Sebox Background ---
     gl.depthMask(false); // Disable depth writing for skybox
-    gl.useProgram(shaderProgram); // Use the background shader program
+    gl.useProgram(backgroundShaderProgram); // Use the renamed background shader program
 
     // Set camera/projection uniforms for background shader
-    gl.uniformMatrix4fv(uBackgroundProjectionMatrixLoc, false, projectionMatrix);
-    gl.uniformMatrix4fv(uBackgroundViewMatrixLoc, false, viewMatrix);
+    gl.uniformMatrix4fv(uBackgroundProjectionMatrixLoc, false, projectionMatrix); // Uses global
+    gl.uniformMatrix4fv(uBackgroundViewMatrixLoc, false, viewMatrix); // Uses global
 
     // Normalized depth for color calculation (same as before for fragment shader)
     const normalizedDepth = Math.min(Math.abs(currentAltitude) / MAX_DEPTH_FOR_COLOR_TRANSITION, 1.0);
-    gl.uniform1f(uDepthLocation, normalizedDepth);
-    // uResolution is not directly used by the updated background shaders but uDepthLocation is.
+    gl.uniform1f(uBackgroundDepthLoc, normalizedDepth); // Uses global
+    // uResolution is not directly used by the updated background shaders but uBackgroundDepthLoc is.
 
     // Bind seabox buffers
     gl.bindBuffer(gl.ARRAY_BUFFER, seaboxVertexBuffer);
-    const seaboxPositionAttributeLocation = gl.getAttribLocation(shaderProgram, "a_position");
+    const seaboxPositionAttributeLocation = gl.getAttribLocation(backgroundShaderProgram, "a_position"); // Use renamed
     gl.enableVertexAttribArray(seaboxPositionAttributeLocation);
     gl.vertexAttribPointer(seaboxPositionAttributeLocation, 3, gl.FLOAT, false, 0, 0); // 3 components for 3D
 
