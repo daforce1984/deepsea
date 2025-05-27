@@ -60,7 +60,9 @@ let sceneDepthTexture;
 
 // Shader for simple texture pass-through (rendering sceneColorTexture to canvas)
 let texturePassThruShaderProgram;
-let uTexturePassThruSamplerLoc;
+// let uTexturePassThruSamplerLoc; // Will be replaced by texturePassThruTextureLoc
+let texturePassThruPosLoc, texturePassThruTexCoordLoc, texturePassThruTextureLoc;
+let passThruQuadBuffer; // For vertices and texcoords for the pass-through shader
 
 
 const godRayParams = { // Default values for god ray parameters
@@ -406,6 +408,13 @@ window.onload = async function() { // Make it async
     gl.enable(gl.DEPTH_TEST); // Enable depth testing
     gl.depthFunc(gl.LEQUAL);    // Near things obscure far things
 
+    // Enable WEBGL_depth_texture extension
+    const depthTextureExtension = gl.getExtension('WEBGL_depth_texture');
+    if (!depthTextureExtension) {
+        console.error("WEBGL_depth_texture extension not available! This is required for sampling the scene depth texture.");
+        // alert("WEBGL_depth_texture extension not available! Depth effects may not work."); // Optional
+    }
+
     // Set canvas size
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -433,47 +442,82 @@ window.onload = async function() { // Make it async
     // Common formats: gl.DEPTH_COMPONENT16 (WebGL2), gl.DEPTH_COMPONENT (needs extension for sampling in GL1)
     // For WebGL 1, if OES_depth_texture is available:
     // gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, canvas.width, canvas.height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT, null);
-    // Let's assume WebGL2 context or available extension for now for gl.DEPTH_COMPONENT / gl.UNSIGNED_INT
     // A more robust WebGL1 approach might involve packing depth into RGBA.
-    // For now, let's try the direct approach. If it fails, we'll know from framebuffer status.
-    // In WebGL2, gl.DEPTH_COMPONENT24 or gl.DEPTH_COMPONENT32F are better.
-    // For this step, we'll use gl.DEPTH_COMPONENT and gl.UNSIGNED_INT, which is common with WEBGL_depth_texture
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, canvas.width, canvas.height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); // NEAREST for depth, not LINEAR
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    // For WebGL2, gl.DEPTH_COMPONENT24 or gl.DEPTH_COMPONENT32F are better.
+    // Using UNSIGNED_SHORT as per current subtask instructions.
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, canvas.width, canvas.height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT, null); // Changed to UNSIGNED_SHORT
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); // Must be NEAREST for depth
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST); // Must be NEAREST for depth
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, sceneDepthTexture, 0);
 
-    const fboStatus = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-    if (fboStatus !== gl.FRAMEBUFFER_COMPLETE) {
-        console.error("Scene FBO setup failed: " + fboStatus.toString());
-        alert("Error: Scene Framebuffer setup failed. God rays depth interaction may not work.");
+    const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    if (status !== gl.FRAMEBUFFER_COMPLETE) {
+        console.error("Scene FBO setup failed. Status: 0x" + status.toString(16));
+        if (status === gl.FRAMEBUFFER_INCOMPLETE_ATTACHMENT) console.error("    Error: FRAMEBUFFER_INCOMPLETE_ATTACHMENT");
+        else if (status === gl.FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT) console.error("    Error: FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT");
+        else if (status === gl.FRAMEBUFFER_INCOMPLETE_DIMENSIONS) console.error("    Error: FRAMEBUFFER_INCOMPLETE_DIMENSIONS (WebGL1: Not a direct enum, but indicates dimension mismatch)");
+        else if (status === gl.FRAMEBUFFER_UNSUPPORTED) console.error("    Error: FRAMEBUFFER_UNSUPPORTED");
+        // WebGL Specific (from WEBGL_depth_texture or general WebGL spec)
+        else if (status === 0x8DAD) console.error("    Error: FRAMEBUFFER_INCOMPLETE_FORMATS_OES (Specific to OES_FB_format_combination, if applicable)"); // FRAMEBUFFER_INCOMPLETE_FORMATS_OES for WebGL1, if using OES extension
+        // Common WebGL2 codes, but good for general knowledge as some drivers might report similar issues with different codes in WebGL1
+        else if (status === 0x8CDD) console.error("    Error: FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER (Typically WebGL2)"); 
+        else if (status === 0x8CDE) console.error("    Error: FRAMEBUFFER_INCOMPLETE_READ_BUFFER (Typically WebGL2)");
+        else console.error("    Error: Unknown FBO status code: 0x" + status.toString(16));
+        // alert("Scene FBO setup failed. Check console."); // Optional
+    } else {
+        console.log("Scene FBO setup appears successful.");
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); // Unbind sceneFBO
 
     // Initialize Texture Pass-Thru Shader Program
-    const passThruVS = `
-        attribute vec2 a_quad_pos;
+    const texturePassThruVS = `
+        attribute vec2 a_quad_position;
+        attribute vec2 a_texCoord;
         varying vec2 v_texCoord;
         void main() {
-            gl_Position = vec4(a_quad_pos, 0.0, 1.0);
-            v_texCoord = a_quad_pos * 0.5 + 0.5; // Convert from [-1,1] to [0,1]
+            gl_Position = vec4(a_quad_position, 0.0, 1.0);
+            v_texCoord = a_texCoord;
         }`;
-    const passThruFS = `
+
+    const texturePassThruFS = `
         precision mediump float;
         varying vec2 v_texCoord;
         uniform sampler2D u_texture;
         void main() {
             gl_FragColor = texture2D(u_texture, v_texCoord);
         }`;
-    texturePassThruShaderProgram = initShaderProgram(gl, passThruVS, passThruFS);
-    if (texturePassThruShaderProgram) {
-        uTexturePassThruSamplerLoc = gl.getUniformLocation(texturePassThruShaderProgram, "u_texture");
-        console.log("Texture Pass-Thru Shader Program initialized.");
+        
+    texturePassThruShaderProgram = initShaderProgram(gl, texturePassThruVS, texturePassThruFS);
+    if (!texturePassThruShaderProgram) {
+        console.error("Failed to initialize texture pass-through shader program!");
+        // alert("Critical error: Failed to initialize texture pass-through shader. Scene will not display.");
+        // Potentially return or throw an error here to stop execution if this is critical
     } else {
-        console.error("Failed to initialize Texture Pass-Thru Shader Program.");
+        texturePassThruPosLoc = gl.getAttribLocation(texturePassThruShaderProgram, "a_quad_position");
+        texturePassThruTexCoordLoc = gl.getAttribLocation(texturePassThruShaderProgram, "a_texCoord");
+        texturePassThruTextureLoc = gl.getUniformLocation(texturePassThruShaderProgram, "u_texture"); // Replaces uTexturePassThruSamplerLoc
+
+        console.log('Texture Pass-Thru Uniforms/Attribs:', {
+            pos: texturePassThruPosLoc,
+            uv: texturePassThruTexCoordLoc,
+            tex: texturePassThruTextureLoc
+        });
+        console.log("Texture Pass-Thru Shader Program initialized.");
     }
+
+    // Create Fullscreen Quad VBO for the pass-through shader
+    const passThruQuadVertices = new Float32Array([
+        // positions X, Y,   texCoords U, V
+        -1.0, -1.0,   0.0, 0.0,
+         1.0, -1.0,   1.0, 0.0,
+        -1.0,  1.0,   0.0, 1.0,
+         1.0,  1.0,   1.0, 1.0,
+    ]);
+    passThruQuadBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, passThruQuadBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, passThruQuadVertices, gl.STATIC_DRAW);
 
 
     // Initialize Projection and View Matrices
@@ -1409,23 +1453,29 @@ function render(timestamp) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, canvas.width, canvas.height); // Reset viewport to canvas
     gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear the actual canvas before drawing the texture to it
-    gl.clear(gl.COLOR_BUFFER_BIT); // Only color needed, depth already handled by FBO/scene
-                                     // No depth test needed for fullscreen quad
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // Clear actual canvas's depth too
 
-    if (texturePassThruShaderProgram && sceneColorTexture && uTexturePassThruSamplerLoc) {
+    if (texturePassThruShaderProgram && sceneColorTexture && texturePassThruTextureLoc && passThruQuadBuffer) {
         gl.useProgram(texturePassThruShaderProgram);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, sceneColorTexture);
-        gl.uniform1i(uTexturePassThruSamplerLoc, 0);
 
-        const passThruQuadPosLoc = gl.getAttribLocation(texturePassThruShaderProgram, "a_quad_pos");
-        if (passThruQuadPosLoc !== -1) {
-            gl.bindBuffer(gl.ARRAY_BUFFER, lightSpotQuadVBO); // Reuse quad VBO
-            gl.vertexAttribPointer(passThruQuadPosLoc, 2, gl.FLOAT, false, 0, 0);
-            gl.enableVertexAttribArray(passThruQuadPosLoc);
-            gl.drawArrays(gl.TRIANGLES, 0, 6);
-            gl.disableVertexAttribArray(passThruQuadPosLoc);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, sceneColorTexture); // Bind the color texture from sceneFBO
+        gl.uniform1i(texturePassThruTextureLoc, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, passThruQuadBuffer);
+        if (texturePassThruPosLoc !== -1) {
+            gl.enableVertexAttribArray(texturePassThruPosLoc);
+            gl.vertexAttribPointer(texturePassThruPosLoc, 2, gl.FLOAT, false, 16, 0); // 2 components, 4 bytes/float * 4 components per vertex = 16 bytes stride, 0 offset
         }
+        if (texturePassThruTexCoordLoc !== -1) {
+            gl.enableVertexAttribArray(texturePassThruTexCoordLoc);
+            gl.vertexAttribPointer(texturePassThruTexCoordLoc, 2, gl.FLOAT, false, 16, 8); // 2 components, 16 bytes stride, 2 floats * 4 bytes/float = 8 bytes offset
+        }
+        
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+        if (texturePassThruPosLoc !== -1) gl.disableVertexAttribArray(texturePassThruPosLoc);
+        if (texturePassThruTexCoordLoc !== -1) gl.disableVertexAttribArray(texturePassThruTexCoordLoc);
     }
 
 
@@ -1497,8 +1547,8 @@ window.onresize = function() {
         }
         if (sceneDepthTexture) {
             gl.bindTexture(gl.TEXTURE_2D, sceneDepthTexture);
-            // Assuming DEPTH_COMPONENT and UNSIGNED_INT from initialization
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, canvas.width, canvas.height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
+            // Corrected to UNSIGNED_SHORT as per FBO setup and current subtask
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, canvas.width, canvas.height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT, null);
         }
         // Also resize occlusionTexture for flashlight spot
         if (occlusionTexture) {

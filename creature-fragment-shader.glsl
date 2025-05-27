@@ -11,7 +11,6 @@ uniform vec3 u_ambientColor;
 
 // New uniforms for flashlight
 uniform bool u_isFlashlightOn;
-uniform vec3 u_flashlightPosition;
 
 // Uniforms for Fog Effect
 uniform vec3 u_fogColor;
