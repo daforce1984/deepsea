@@ -12,6 +12,13 @@ uniform vec3 u_ambientColor;
 // New uniforms for flashlight
 uniform bool u_isFlashlightOn;
 uniform vec3 u_flashlightPosition;
+
+// Uniforms for Fog Effect
+uniform vec3 u_fogColor;
+uniform float u_fogStartDistance;
+uniform float u_fogEndDistance;
+
+uniform vec3 u_flashlightPosition;
 uniform vec3 u_flashlightDirection; // Normalized direction vector
 uniform vec3 u_flashlightColor;
 uniform float u_flashlightIntensity;
@@ -79,6 +86,14 @@ void main() {
     }
     
     // Clamp final color to avoid over-saturation, though HDR might be better in a full engine
+    finalColor = clamp(finalColor, 0.0, 1.0);
+
+    // Apply Fog
+    float distanceToCamera = length(v_worldPosition - u_cameraPosition);
+    float fogFactor = smoothstep(u_fogStartDistance, u_fogEndDistance, distanceToCamera);
+    finalColor = mix(finalColor, u_fogColor, fogFactor);
+    
+    // Final clamp might be redundant if already done, but safe.
     finalColor = clamp(finalColor, 0.0, 1.0); 
 
     gl_FragColor = vec4(finalColor, 1.0); // Assuming creature alpha is 1.0

@@ -19,6 +19,12 @@ let gl;
 const MAX_PARTICLES = 500;
 let activeParticles = [];
 const PARTICLE_TYPE = { DUST: 0, BUBBLE: 1 };
+
+const DUST_BOX_SIZE_X = 5.0; // Width of the dust box (meters)
+const DUST_BOX_SIZE_Y = 3.0; // Height
+const DUST_BOX_SIZE_Z = 7.0; // Depth (how far in front/behind camera)
+const TARGET_DUST_PARTICLES_IN_BOX = 50; // Desired number of dust particles
+
 let particleShaderProgram;
 let particleVertexBufferGL; // VBO for a unit quad
 let aParticleQuadVertexLoc; // Attribute for particle shader's a_particle_quad_vertex
@@ -44,7 +50,18 @@ let lightSpotQuadVBO; // VBO for a simple quad
 let godRayShaderProgram;
 let uOcclusionTextureLoc, uLightScreenPosLoc;
 let uGodRayNumSamplesLoc, uGodRayDecayLoc, uGodRayExposureLoc, uGodRayDensityLoc, uGodRayWeightLoc; // New uniform locations
+let uSceneDepthTextureLoc, uCameraNearLoc, uCameraFarLoc; // For depth interaction in god rays
 // We can reuse lightSpotQuadVBO for the fullscreen quad
+
+// Scene Framebuffer Object (FBO) for rendering the main scene to texture
+let sceneFBO;
+let sceneColorTexture;
+let sceneDepthTexture;
+
+// Shader for simple texture pass-through (rendering sceneColorTexture to canvas)
+let texturePassThruShaderProgram;
+let uTexturePassThruSamplerLoc;
+
 
 const godRayParams = { // Default values for god ray parameters
     numSamples: 64, // Integer
@@ -108,6 +125,9 @@ const flashlightOuterConeAngle = 30.0 * Math.PI / 180; // Outer cone for penumbr
 // Uniform locations for flashlight (in creatureShaderProgram)
 let uIsFlashlightOnLoc, uFlashlightPosLoc, uFlashlightDirLoc, uFlashlightColorLoc;
 let uFlashlightIntensityLoc, uFlashlightConeCosLoc, uFlashlightOuterConeCosLoc;
+
+// Fog uniform locations (for creatureShaderProgram)
+let uFogColorLoc, uFogStartDistanceLoc, uFogEndDistanceLoc;
 
 // Lighting and new uniform/attribute locations
 let uCreatureModelMatrixLoc, uCreatureViewMatrixLoc, uCreatureProjectionMatrixLoc;
@@ -391,6 +411,71 @@ window.onload = async function() { // Make it async
     canvas.height = window.innerHeight;
     gl.viewport(0, 0, canvas.width, canvas.height);
 
+    // Initialize Scene FBO, Color Texture, and Depth Texture
+    sceneFBO = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, sceneFBO);
+
+    sceneColorTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, sceneColorTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, sceneColorTexture, 0);
+
+    sceneDepthTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, sceneDepthTexture);
+    // For WebGL1, DEPTH_COMPONENT textures are tricky.
+    // Using DEPTH_COMPONENT with UNSIGNED_SHORT or UNSIGNED_INT often requires OES_depth_texture extension.
+    // For broader compatibility without extensions, one might render depth to an RGBA texture.
+    // However, let's try with DEPTH_COMPONENT and check status.
+    // Common formats: gl.DEPTH_COMPONENT16 (WebGL2), gl.DEPTH_COMPONENT (needs extension for sampling in GL1)
+    // For WebGL 1, if OES_depth_texture is available:
+    // gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, canvas.width, canvas.height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT, null);
+    // Let's assume WebGL2 context or available extension for now for gl.DEPTH_COMPONENT / gl.UNSIGNED_INT
+    // A more robust WebGL1 approach might involve packing depth into RGBA.
+    // For now, let's try the direct approach. If it fails, we'll know from framebuffer status.
+    // In WebGL2, gl.DEPTH_COMPONENT24 or gl.DEPTH_COMPONENT32F are better.
+    // For this step, we'll use gl.DEPTH_COMPONENT and gl.UNSIGNED_INT, which is common with WEBGL_depth_texture
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, canvas.width, canvas.height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); // NEAREST for depth, not LINEAR
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, sceneDepthTexture, 0);
+
+    const fboStatus = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    if (fboStatus !== gl.FRAMEBUFFER_COMPLETE) {
+        console.error("Scene FBO setup failed: " + fboStatus.toString());
+        alert("Error: Scene Framebuffer setup failed. God rays depth interaction may not work.");
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); // Unbind sceneFBO
+
+    // Initialize Texture Pass-Thru Shader Program
+    const passThruVS = `
+        attribute vec2 a_quad_pos;
+        varying vec2 v_texCoord;
+        void main() {
+            gl_Position = vec4(a_quad_pos, 0.0, 1.0);
+            v_texCoord = a_quad_pos * 0.5 + 0.5; // Convert from [-1,1] to [0,1]
+        }`;
+    const passThruFS = `
+        precision mediump float;
+        varying vec2 v_texCoord;
+        uniform sampler2D u_texture;
+        void main() {
+            gl_FragColor = texture2D(u_texture, v_texCoord);
+        }`;
+    texturePassThruShaderProgram = initShaderProgram(gl, passThruVS, passThruFS);
+    if (texturePassThruShaderProgram) {
+        uTexturePassThruSamplerLoc = gl.getUniformLocation(texturePassThruShaderProgram, "u_texture");
+        console.log("Texture Pass-Thru Shader Program initialized.");
+    } else {
+        console.error("Failed to initialize Texture Pass-Thru Shader Program.");
+    }
+
+
     // Initialize Projection and View Matrices
     aspect = canvas.width / canvas.height;
     projectionMatrix = glMatrix.mat4.create();
@@ -515,6 +600,16 @@ window.onload = async function() { // Make it async
     uFlashlightIntensityLoc = gl.getUniformLocation(creatureShaderProgram, "u_flashlightIntensity");
     uFlashlightConeCosLoc = gl.getUniformLocation(creatureShaderProgram, "u_flashlightConeCos");
     uFlashlightOuterConeCosLoc = gl.getUniformLocation(creatureShaderProgram, "u_flashlightOuterConeCos");
+
+    // Get Fog Uniform Locations (for creatureShaderProgram)
+    uFogColorLoc = gl.getUniformLocation(creatureShaderProgram, "u_fogColor");
+    uFogStartDistanceLoc = gl.getUniformLocation(creatureShaderProgram, "u_fogStartDistance");
+    uFogEndDistanceLoc = gl.getUniformLocation(creatureShaderProgram, "u_fogEndDistance");
+    console.log('Fog Uniform Locations:', { 
+        color: uFogColorLoc, 
+        start: uFogStartDistanceLoc, 
+        end: uFogEndDistanceLoc 
+    });
 
     // Initialize Flashlight Model
     flashlightModel = generateCylinder(1.0, 1.0, 16); // Unit cylinder (radius 1, height 1)
@@ -665,9 +760,16 @@ window.onload = async function() { // Make it async
             uGodRayExposureLoc = gl.getUniformLocation(godRayShaderProgram, "u_exposure");
             uGodRayDensityLoc = gl.getUniformLocation(godRayShaderProgram, "u_density");
             uGodRayWeightLoc = gl.getUniformLocation(godRayShaderProgram, "u_weight");
+            // Get new uniforms for depth interaction
+            uSceneDepthTextureLoc = gl.getUniformLocation(godRayShaderProgram, "u_sceneDepthTexture");
+            uCameraNearLoc = gl.getUniformLocation(godRayShaderProgram, "u_cameraNear");
+            uCameraFarLoc = gl.getUniformLocation(godRayShaderProgram, "u_cameraFar");
             console.log('GodRay Shader Uniforms:', { 
                 u_occlusionTexture: uOcclusionTextureLoc, 
                 u_lightScreenPos: uLightScreenPosLoc,
+                u_sceneDepthTexture: uSceneDepthTextureLoc,
+                u_cameraNear: uCameraNearLoc,
+                u_cameraFar: uCameraFarLoc,
                 numSamples: uGodRayNumSamplesLoc, 
                 decay: uGodRayDecayLoc, 
                 exposure: uGodRayExposureLoc, 
@@ -712,35 +814,44 @@ window.onload = async function() { // Make it async
     requestAnimationFrame(render); // Start render loop
 };
 
-function spawnParticle() {
+function spawnParticle(forcedType = null) {
     if (activeParticles.length >= MAX_PARTICLES) return;
 
-    const type = (Math.random() < 0.3) ? PARTICLE_TYPE.BUBBLE : PARTICLE_TYPE.DUST;
-    
-    // Spawn in a volume around and in front of the camera
-    const spawnVolRadius = 500; // Horizontal/Vertical spawn radius from camera center
-    const spawnVolDepth = 1000; // How far in front particles can spawn
+    const type = forcedType !== null ? forcedType :
+                 (Math.random() < 0.3 ? PARTICLE_TYPE.BUBBLE : PARTICLE_TYPE.DUST); // Default random choice
 
     let position = glMatrix.vec3.create();
-    // Random offset from camera position
-    position[0] = cameraPosition[0] + (Math.random() - 0.5) * spawnVolRadius * 2;
-    position[1] = cameraPosition[1] + (Math.random() - 0.5) * spawnVolRadius; // Spawn around camera's Y
-    position[2] = cameraPosition[2] - (Math.random() * spawnVolDepth);     // Spawn in front
-
     let velocity = glMatrix.vec3.create();
-    let life = Math.random() * 3.0 + 2.0; // Lifetime 2-5 seconds
-    let color = (type === PARTICLE_TYPE.BUBBLE) ? [...BUBBLE_COLOR] : [...DUST_COLOR];
-    let size = (type === PARTICLE_TYPE.BUBBLE) ? (Math.random() * 5 + 5) : (Math.random() * 2 + 1);
+    let life;
+    let color;
+    let size;
 
-    if (type === PARTICLE_TYPE.BUBBLE) {
+    if (type === PARTICLE_TYPE.DUST) {
+        position[0] = cameraPosition[0] + (Math.random() - 0.5) * DUST_BOX_SIZE_X;
+        position[1] = cameraPosition[1] + (Math.random() - 0.5) * DUST_BOX_SIZE_Y;
+        position[2] = cameraPosition[2] + (Math.random() - 0.65) * DUST_BOX_SIZE_Z; // Bias slightly in front
+
+        velocity[0] = (Math.random() - 0.5) * 0.2;
+        velocity[1] = (Math.random() - 0.5) * 0.2 - 0.1; // Slight sink
+        velocity[2] = (Math.random() - 0.5) * 0.2;
+        life = Math.random() * 2.5 + 1.5; // Lifetime 1.5-4 seconds for dust
+        size = Math.random() * 1.5 + 0.5;
+        color = [...DUST_COLOR]; // Use global DUST_COLOR
+        color[3] = 0.0; // Start transparent for fade-in
+    } else { // Existing BUBBLE spawning logic (or any other types)
+        // Keep original bubble spawning logic using spawnVolRadius, etc.
+        const spawnVolRadius = 500; 
+        const spawnVolDepth = 1000;
+        position[0] = cameraPosition[0] + (Math.random() - 0.5) * spawnVolRadius * 1; // Bubbles can spawn wider
+        position[1] = cameraPosition[1] + (Math.random() - 0.5) * spawnVolRadius * 0.5;
+        position[2] = cameraPosition[2] - (Math.random() * spawnVolDepth * 0.5); // Bubbles mostly in front
+
         velocity[1] = Math.random() * 50 + 30; // Bubbles rise
         velocity[0] = (Math.random() - 0.5) * 10;
         velocity[2] = (Math.random() - 0.5) * 10;
-    } else { // Dust
-        velocity[0] = (Math.random() - 0.5) * 5;
-        velocity[1] = (Math.random() - 0.5) * 5 - 10; // Dust mostly sinks slowly
-        velocity[2] = (Math.random() - 0.5) * 5;
-        size *= 2.0; // Make dust specks a bit larger for visibility if very transparent
+        life = Math.random() * 3.0 + 2.0;
+        color = [...BUBBLE_COLOR];
+        size = Math.random() * 5 + 5;
     }
     
     activeParticles.push({ position, velocity, color, life, type, size, initialLife: life });
@@ -751,17 +862,66 @@ function updateParticles(deltaTime) {
         let p = activeParticles[i];
         p.life -= deltaTime;
 
+        // Note: Particle removal is handled later, after alpha updates
+
+        glMatrix.vec3.scaleAndAdd(p.position, p.position, p.velocity, deltaTime);
+
+        // Fade-in/out for Dust Particles & Original Bubble Fade
+        if (p.type === PARTICLE_TYPE.DUST) {
+            const age = p.initialLife - p.life;
+            const fadeInDuration = 0.75; // seconds to fade in
+            
+            if (age < fadeInDuration) {
+                p.color[3] = (age / fadeInDuration) * DUST_COLOR[3];
+            } else {
+                // Fade out based on remaining life, but start after fadeIn is complete
+                if (p.initialLife > fadeInDuration) {
+                    p.color[3] = DUST_COLOR[3] * (p.life / (p.initialLife - fadeInDuration));
+                } else { // If lifetime is shorter than fade-in, just use full alpha then let it die
+                    p.color[3] = DUST_COLOR[3];
+                }
+            }
+        } else if (p.type === PARTICLE_TYPE.BUBBLE) {
+            p.color[3] = BUBBLE_COLOR[3] * (p.life / p.initialLife); // Original bubble fade
+        }
+        // Clamp alpha
+        p.color[3] = Math.max(0.0, Math.min(p.color[3], (p.type === PARTICLE_TYPE.DUST ? DUST_COLOR[3] : BUBBLE_COLOR[3])));
+
+        // Clipping/Fading at Box Edges for Dust Particles
+        if (p.type === PARTICLE_TYPE.DUST) {
+            const halfBoxX = DUST_BOX_SIZE_X / 2.0;
+            const halfBoxY = DUST_BOX_SIZE_Y / 2.0;
+            const halfBoxZ = DUST_BOX_SIZE_Z / 2.0;
+            const localPos = glMatrix.vec3.subtract([], p.position, cameraPosition);
+            
+            let outsideFactor = 0.0;
+            const fadeOutMargin = 0.75; // meters, how far outside before fully transparent
+
+            if (Math.abs(localPos[0]) > halfBoxX) {
+                outsideFactor = Math.max(outsideFactor, (Math.abs(localPos[0]) - halfBoxX) / fadeOutMargin);
+            }
+            if (Math.abs(localPos[1]) > halfBoxY) {
+                outsideFactor = Math.max(outsideFactor, (Math.abs(localPos[1]) - halfBoxY) / fadeOutMargin);
+            }
+            if (Math.abs(localPos[2]) > halfBoxZ) { // Assumes camera is at the center of the box for Z
+                outsideFactor = Math.max(outsideFactor, (Math.abs(localPos[2]) - halfBoxZ) / fadeOutMargin);
+            }
+
+            if (outsideFactor > 0.0) {
+                p.color[3] *= (1.0 - Math.min(1.0, outsideFactor));
+            }
+
+            if (outsideFactor > 1.0 || p.color[3] < 0.01) {
+                p.life = Math.min(p.life, 0.05); // Kill particle quickly if far out or fully faded
+            }
+        }
+        
         if (p.life <= 0) {
             activeParticles.splice(i, 1);
             continue;
         }
-
-        glMatrix.vec3.scaleAndAdd(p.position, p.position, p.velocity, deltaTime);
-
-        // Fade out particles (adjust alpha)
-        p.color[3] = ((p.type === PARTICLE_TYPE.BUBBLE) ? BUBBLE_COLOR[3] : DUST_COLOR[3]) * (p.life / p.initialLife);
         
-        // Optional: Bubbles expand slightly?
+        // Optional: Bubbles expand slightly? (Original comment, can be kept or removed)
         // if (p.type === PARTICLE_TYPE.BUBBLE) p.size *= (1 + deltaTime * 0.1);
     }
 }
@@ -841,6 +1001,14 @@ function render(timestamp) {
     }
 
     // ... rest of the existing render function (main canvas clearing, seabox, creatures, particles, etc.)
+
+    // 1. Bind Scene FBO to render the main scene to texture
+    gl.bindFramebuffer(gl.FRAMEBUFFER, sceneFBO);
+    gl.viewport(0, 0, canvas.width, canvas.height); // Ensure viewport matches FBO textures
+    gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear scene FBO (background color for the scene texture)
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    // Note: Depth buffer for sceneFBO is cleared here.
+
     const deltaTime = (timestamp - lastTimestamp) / 1000;
     lastTimestamp = timestamp;
 
@@ -877,12 +1045,12 @@ function render(timestamp) {
         lastSpawnDepth = currentAltitude; // Update last spawn depth marker
     }
 
-    // Clear the canvas
-    gl.clearColor(0.0, 0.0, 0.0, 1.0); // Set clear color (can be redundant if shader covers screen)
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    // // Clear the canvas // This is now done for the FBO above.
+    // gl.clearColor(0.0, 0.0, 0.0, 1.0); 
+    // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    // --- Render Sebox Background ---
-    gl.depthMask(false); // Disable depth writing for skybox
+    // --- Render Sebox Background (to sceneFBO) ---
+    gl.depthMask(false); // Disable depth writing for skybox (standard practice for skyboxes)
     gl.useProgram(backgroundShaderProgram); // Use the renamed background shader program
 
     // Set camera/projection uniforms for background shader
@@ -955,6 +1123,16 @@ function render(timestamp) {
     // Pass view and projection matrices (these are global, set once if not per-object)
     gl.uniformMatrix4fv(uCreatureViewMatrixLoc, false, viewMatrix);
     gl.uniformMatrix4fv(uCreatureProjectionMatrixLoc, false, projectionMatrix);
+
+    // Set Fog Uniforms (for creatureShaderProgram)
+    const fogColor = [0.0, 0.01, 0.025, 1.0]; // Very dark blue/grey, for "deep sea"
+    const fogStartDistance = 1.0;     // Start fog effect 
+    const fogEndDistance = 750.0;      // Objects are fully obscured by fog at this distance
+
+    if (uFogColorLoc !== null && uFogColorLoc !== -1) gl.uniform3fv(uFogColorLoc, fogColor.slice(0,3)); // Pass RGB
+    if (uFogStartDistanceLoc !== null && uFogStartDistanceLoc !== -1) gl.uniform1f(uFogStartDistanceLoc, fogStartDistance);
+    if (uFogEndDistanceLoc !== null && uFogEndDistanceLoc !== -1) gl.uniform1f(uFogEndDistanceLoc, fogEndDistance);
+
 
     // Enable vertex attributes before the loop
     if (creaturePosAttrLoc !== -1 && typeof creaturePosAttrLoc !== 'undefined') { // Check if valid before enabling
@@ -1038,9 +1216,36 @@ function render(timestamp) {
     }
 
     // --- Particle System Logic and Rendering ---
-    if (Math.random() < PARTICLE_SPAWN_RATE) { // Probabilistic spawn
-      for(let k=0; k < 3; ++k) spawnParticle(); // Spawn a few particles at a time
+    // Maintain Dust Particle Count
+    let dustParticlesInBoxCount = 0;
+    for (const p of activeParticles) {
+        if (p.type === PARTICLE_TYPE.DUST) {
+            const localPos = glMatrix.vec3.subtract([], p.position, cameraPosition);
+            if (Math.abs(localPos[0]) <= DUST_BOX_SIZE_X / 2.0 &&
+                Math.abs(localPos[1]) <= DUST_BOX_SIZE_Y / 2.0 &&
+                Math.abs(localPos[2]) <= DUST_BOX_SIZE_Z / 2.0) {
+                dustParticlesInBoxCount++;
+            }
+        }
     }
+
+    const maxDustToSpawnPerFrame = 3;
+    let spawnedThisFrame = 0;
+    if (dustParticlesInBoxCount < TARGET_DUST_PARTICLES_IN_BOX) {
+        for (let k = 0; k < (TARGET_DUST_PARTICLES_IN_BOX - dustParticlesInBoxCount) && spawnedThisFrame < maxDustToSpawnPerFrame; ++k) {
+            if (activeParticles.length >= MAX_PARTICLES) break;
+            spawnParticle(PARTICLE_TYPE.DUST); // Force spawn DUST
+            spawnedThisFrame++;
+        }
+    }
+    
+    // Optional: Spawn bubbles randomly and less frequently
+    if (Math.random() < 0.02) { 
+        if (activeParticles.length < MAX_PARTICLES) {
+            spawnParticle(PARTICLE_TYPE.BUBBLE);
+        }
+    }
+
     updateParticles(deltaTime);
 
     if (activeParticles.length > 0 && particleShaderProgram) {
@@ -1199,8 +1404,33 @@ function render(timestamp) {
         }
     }
     
-    // --- God Ray Rendering Pass (This is the new location) ---
-    if (isFlashlightOn && godRayShaderProgram && occlusionTexture && uOcclusionTextureLoc && uLightScreenPosLoc) {
+    // --- God Ray Rendering Pass (This is the new location, happens AFTER scene is on canvas) ---
+    // First, unbind sceneFBO and render sceneColorTexture to the main canvas
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, canvas.width, canvas.height); // Reset viewport to canvas
+    gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear the actual canvas before drawing the texture to it
+    gl.clear(gl.COLOR_BUFFER_BIT); // Only color needed, depth already handled by FBO/scene
+                                     // No depth test needed for fullscreen quad
+
+    if (texturePassThruShaderProgram && sceneColorTexture && uTexturePassThruSamplerLoc) {
+        gl.useProgram(texturePassThruShaderProgram);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, sceneColorTexture);
+        gl.uniform1i(uTexturePassThruSamplerLoc, 0);
+
+        const passThruQuadPosLoc = gl.getAttribLocation(texturePassThruShaderProgram, "a_quad_pos");
+        if (passThruQuadPosLoc !== -1) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, lightSpotQuadVBO); // Reuse quad VBO
+            gl.vertexAttribPointer(passThruQuadPosLoc, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(passThruQuadPosLoc);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            gl.disableVertexAttribArray(passThruQuadPosLoc);
+        }
+    }
+
+
+    // Now, proceed with God Rays if flashlight is on. This will be blended on top of the scene.
+    if (isFlashlightOn && godRayShaderProgram && occlusionTexture && uOcclusionTextureLoc && uLightScreenPosLoc && sceneDepthTexture) {
         gl.useProgram(godRayShaderProgram);
 
         // Set up for additive blending
@@ -1208,12 +1438,23 @@ function render(timestamp) {
         gl.blendFunc(gl.ONE, gl.ONE); // Additive blending (source + destination)
         // gl.depthMask(false); // God rays typically don't write to depth
 
-        gl.activeTexture(gl.TEXTURE0);
+        gl.activeTexture(gl.TEXTURE0); // Occlusion texture still on unit 0
         gl.bindTexture(gl.TEXTURE_2D, occlusionTexture);
-        gl.uniform1i(uOcclusionTextureLoc, 0); // Texture unit 0
+        gl.uniform1i(uOcclusionTextureLoc, 0);
+
+        // Bind sceneDepthTexture to another unit (e.g., TEXTURE1)
+        if (uSceneDepthTextureLoc) {
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, sceneDepthTexture);
+            gl.uniform1i(uSceneDepthTextureLoc, 1); // Texture unit 1
+        }
+
+        // Set camera near/far for depth linearization
+        if (uCameraNearLoc) gl.uniform1f(uCameraNearLoc, zNear);
+        if (uCameraFarLoc) gl.uniform1f(uCameraFarLoc, zFar);
 
         // Light position on screen (center for now, as light spot is screen-centered)
-        gl.uniform2f(uLightScreenPosLoc, 0.5, 0.5); 
+        gl.uniform2f(uLightScreenPosLoc, 0.5, 0.5);
 
         if(uGodRayNumSamplesLoc) gl.uniform1i(uGodRayNumSamplesLoc, godRayParams.numSamples);
         if(uGodRayDecayLoc) gl.uniform1f(uGodRayDecayLoc, godRayParams.decay);
@@ -1244,10 +1485,28 @@ window.onresize = function() {
     if (canvas && gl && projectionMatrix && typeof glMatrix !== 'undefined') {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.viewport(0, 0, canvas.width, canvas.height); // Default viewport for canvas
         aspect = canvas.width / canvas.height;
         glMatrix.mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
         console.log("Resized canvas and updated 3D projection matrix.");
+
+        // Resize FBO textures as well
+        if (sceneColorTexture) {
+            gl.bindTexture(gl.TEXTURE_2D, sceneColorTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        }
+        if (sceneDepthTexture) {
+            gl.bindTexture(gl.TEXTURE_2D, sceneDepthTexture);
+            // Assuming DEPTH_COMPONENT and UNSIGNED_INT from initialization
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT, canvas.width, canvas.height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
+        }
+        // Also resize occlusionTexture for flashlight spot
+        if (occlusionTexture) {
+            gl.bindTexture(gl.TEXTURE_2D, occlusionTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        }
+        gl.bindTexture(gl.TEXTURE_2D, null); // Unbind
+        console.log("Resized FBO textures.");
     }
 };
 
