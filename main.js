@@ -16,14 +16,14 @@ const glMatrix = {
 let gl;
 
 // Particle System Variables
-const MAX_PARTICLES = 500;
+const MAX_PARTICLES = 25000;
 let activeParticles = [];
 const PARTICLE_TYPE = { DUST: 0, BUBBLE: 1 };
 
 const DUST_BOX_SIZE_X = 5.0; // Width of the dust box (meters)
 const DUST_BOX_SIZE_Y = 3.0; // Height
 const DUST_BOX_SIZE_Z = 7.0; // Depth (how far in front/behind camera)
-const TARGET_DUST_PARTICLES_IN_BOX = 50; // Desired number of dust particles
+const TARGET_DUST_PARTICLES_IN_BOX = 20000; // Desired number of dust particles
 
 let particleShaderProgram;
 let particleVertexBufferGL; // VBO for a unit quad
@@ -89,8 +89,7 @@ let loadedGLBData = {
     indexType: null // Will store gl.UNSIGNED_SHORT or gl.UNSIGNED_INT
 };
 
-// let flashlightCubeModel = { ... }; // REMOVED
-// let flashlightCubeVertexBufferGL, flashlightCubeNormalBufferGL, flashlightCubeIndexBufferGL; // REMOVED
+// flashlightCubeModel and its buffers were here, now fully removed.
 
 const FLASHLIGHT_MODEL_COLOR = [0.25, 0.25, 0.3, 1.0]; // Dark greyish color
 
@@ -870,7 +869,7 @@ window.onload = async function() { // Make it async
     });
 
     // Initialize Flashlight Model Buffers from loadedGLBData
-    // flashlightModel = generateCylinder(1.0, 1.0, 16); // REMOVED - Replaced by GLB
+    // flashlightModel = generateCylinder(1.0, 1.0, 16); // This line was already removed correctly.
 
     flashlightVertexBufferGL = gl.createBuffer(); // Ensure these are declared globally
     flashlightNormalBufferGL = gl.createBuffer();
@@ -893,17 +892,8 @@ window.onload = async function() { // Make it async
         // For now, relying on the error console log.
     }
 
-    // flashlightCubeVertexBufferGL = gl.createBuffer(); // REMOVED
-    // gl.bindBuffer(gl.ARRAY_BUFFER, flashlightCubeVertexBufferGL); // REMOVED
-    // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flashlightCubeModel.vertices), gl.STATIC_DRAW); // REMOVED
-
-    // flashlightCubeNormalBufferGL = gl.createBuffer(); // REMOVED
-    // gl.bindBuffer(gl.ARRAY_BUFFER, flashlightCubeNormalBufferGL); // REMOVED
-    // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flashlightCubeModel.normals), gl.STATIC_DRAW); // REMOVED
-
-    // flashlightCubeIndexBufferGL = gl.createBuffer(); // REMOVED
-    // gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, flashlightCubeIndexBufferGL); // REMOVED
-    // gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(flashlightCubeModel.indices), gl.STATIC_DRAW); // REMOVED
+    // All lines related to flashlightCubeVertexBufferGL, flashlightCubeNormalBufferGL, 
+    // and flashlightCubeIndexBufferGL buffer creation and data population were here, now fully removed.
 
 
     // Basic clear color - might be overridden by shader but good for initial setup
@@ -1064,8 +1054,12 @@ window.onload = async function() { // Make it async
             cameraYaw += event.movementX * mouseSensitivity;
             cameraPitch -= event.movementY * mouseSensitivity;
 
+            // Clamp pitch
             const maxPitch = Math.PI / 2 - 0.01; // Just under 90 degrees
             cameraPitch = Math.max(-maxPitch, Math.min(maxPitch, cameraPitch));
+
+            // Normalize yaw to the range [0, 2*PI)
+            cameraYaw = (cameraYaw % (2 * Math.PI) + (2 * Math.PI)) % (2 * Math.PI);
         }
     }
 
@@ -1085,8 +1079,8 @@ window.onload = async function() { // Make it async
 function spawnParticle(forcedType = null) {
     if (activeParticles.length >= MAX_PARTICLES) return;
 
-    const type = forcedType !== null ? forcedType :
-                 (Math.random() < 0.3 ? PARTICLE_TYPE.BUBBLE : PARTICLE_TYPE.DUST); // Default random choice
+    // Ensure all particles are DUST type unless a different type is forced (which is not the case for BUBBLE anymore)
+    const type = forcedType !== null ? forcedType : PARTICLE_TYPE.DUST;
 
     let position = glMatrix.vec3.create();
     let velocity = glMatrix.vec3.create();
@@ -1103,23 +1097,42 @@ function spawnParticle(forcedType = null) {
         velocity[1] = (Math.random() - 0.5) * 0.2 - 0.1; // Slight sink
         velocity[2] = (Math.random() - 0.5) * 0.2;
         life = Math.random() * 2.5 + 1.5; // Lifetime 1.5-4 seconds for dust
-        size = Math.random() * 1.5 + 0.5;
+        size = Math.random() * 0.3 + 0.1; // Adjusted particle size
         color = [...DUST_COLOR]; // Use global DUST_COLOR
         color[3] = 0.0; // Start transparent for fade-in
-    } else { // Existing BUBBLE spawning logic (or any other types)
-        // Keep original bubble spawning logic using spawnVolRadius, etc.
-        const spawnVolRadius = 500; 
-        const spawnVolDepth = 1000;
-        position[0] = cameraPosition[0] + (Math.random() - 0.5) * spawnVolRadius * 1; // Bubbles can spawn wider
-        position[1] = cameraPosition[1] + (Math.random() - 0.5) * spawnVolRadius * 0.5;
-        position[2] = cameraPosition[2] - (Math.random() * spawnVolDepth * 0.5); // Bubbles mostly in front
+    // } else { // REMOVE BUBBLE SPAWNING LOGIC - All particles will be dust
+        // The properties below were for BUBBLE type, now removed.
+        // const spawnVolRadius = 500; 
+        // const spawnVolDepth = 1000;
+        // position[0] = cameraPosition[0] + (Math.random() - 0.5) * spawnVolRadius * 1; 
+        // position[1] = cameraPosition[1] + (Math.random() - 0.5) * spawnVolRadius * 0.5;
+        // position[2] = cameraPosition[2] - (Math.random() * spawnVolDepth * 0.5); 
 
-        velocity[1] = Math.random() * 50 + 30; // Bubbles rise
-        velocity[0] = (Math.random() - 0.5) * 10;
-        velocity[2] = (Math.random() - 0.5) * 10;
-        life = Math.random() * 3.0 + 2.0;
-        color = [...BUBBLE_COLOR];
-        size = Math.random() * 5 + 5;
+        // velocity[1] = Math.random() * 50 + 30; 
+        // velocity[0] = (Math.random() - 0.5) * 10;
+        // velocity[2] = (Math.random() - 0.5) * 10;
+        // life = Math.random() * 3.0 + 2.0;
+        // color = [...BUBBLE_COLOR];
+        // size = Math.random() * 5 + 5;
+    }
+    // Ensure all particles are added with dust properties if the 'else' block was entered previously by a forced BUBBLE type.
+    // Since 'type' is now always DUST unless forced otherwise (and BUBBLE is not forced),
+    // this re-assignment block ensures consistency if any other PARTICLE_TYPE were to be added later and forced.
+    if (type !== PARTICLE_TYPE.DUST && forcedType !== null) {
+        // This case should ideally not be hit if only DUST is intended.
+        // If a new forcedType (other than DUST) is ever used, it would need its own property definitions.
+        // For now, to prevent errors, we can default to DUST properties if somehow reached.
+        console.warn(`Particle type ${type} forced, but only DUST properties are defined. Defaulting to DUST properties.`);
+        position[0] = cameraPosition[0] + (Math.random() - 0.5) * DUST_BOX_SIZE_X;
+        position[1] = cameraPosition[1] + (Math.random() - 0.5) * DUST_BOX_SIZE_Y;
+        position[2] = cameraPosition[2] + (Math.random() - 0.65) * DUST_BOX_SIZE_Z;
+        velocity[0] = (Math.random() - 0.5) * 0.2;
+        velocity[1] = (Math.random() - 0.5) * 0.2 - 0.1;
+        velocity[2] = (Math.random() - 0.5) * 0.2;
+        life = Math.random() * 2.5 + 1.5;
+        size = Math.random() * 1.5 + 0.5;
+        color = [...DUST_COLOR];
+        color[3] = 0.0; // Start transparent
     }
     
     activeParticles.push({ position, velocity, color, life, type, size, initialLife: life });
@@ -1149,13 +1162,15 @@ function updateParticles(deltaTime) {
                     p.color[3] = DUST_COLOR[3];
                 }
             }
-        } else if (p.type === PARTICLE_TYPE.BUBBLE) {
-            p.color[3] = BUBBLE_COLOR[3] * (p.life / p.initialLife); // Original bubble fade
+        // } else if (p.type === PARTICLE_TYPE.BUBBLE) { // REMOVE BUBBLE ALPHA LOGIC
+            // p.color[3] = BUBBLE_COLOR[3] * (p.life / p.initialLife); 
         }
-        // Clamp alpha
-        p.color[3] = Math.max(0.0, Math.min(p.color[3], (p.type === PARTICLE_TYPE.DUST ? DUST_COLOR[3] : BUBBLE_COLOR[3])));
+        // Clamp alpha - now only DUST_COLOR[3] is relevant for the max alpha
+        p.color[3] = Math.max(0.0, Math.min(p.color[3], DUST_COLOR[3]));
+
 
         // Clipping/Fading at Box Edges for Dust Particles
+        // This logic remains as it's specific to DUST type, which is now the only type.
         if (p.type === PARTICLE_TYPE.DUST) {
             const halfBoxX = DUST_BOX_SIZE_X / 2.0;
             const halfBoxY = DUST_BOX_SIZE_Y / 2.0;
@@ -1507,12 +1522,12 @@ function render(timestamp) {
         }
     }
     
-    // Optional: Spawn bubbles randomly and less frequently
-    if (Math.random() < 0.02) { 
-        if (activeParticles.length < MAX_PARTICLES) {
-            spawnParticle(PARTICLE_TYPE.BUBBLE);
-        }
-    }
+    // Optional: Spawn bubbles randomly and less frequently - REMOVE THIS BLOCK
+    // if (Math.random() < 0.02) { 
+    //     if (activeParticles.length < MAX_PARTICLES) {
+    //         spawnParticle(PARTICLE_TYPE.BUBBLE); // This would now spawn a DUST particle due to changes in spawnParticle
+    //     }
+    // }
 
     updateParticles(deltaTime);
 
