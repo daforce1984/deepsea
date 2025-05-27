@@ -61,6 +61,32 @@ let flashlightModel = {
     indices: []
 };
 let flashlightVertexBufferGL, flashlightNormalBufferGL, flashlightIndexBufferGL;
+
+let flashlightCubeModel = {
+    vertices: [ // Standard 1x1x1 cube vertices (same as creatureShapes.SHARK.vertices)
+        -0.5, -0.5,  0.5,   0.5, -0.5,  0.5,   0.5,  0.5,  0.5,  -0.5,  0.5,  0.5,
+        -0.5, -0.5, -0.5,  -0.5,  0.5, -0.5,   0.5,  0.5, -0.5,   0.5, -0.5, -0.5,
+        -0.5,  0.5, -0.5,  -0.5,  0.5,  0.5,   0.5,  0.5,  0.5,   0.5,  0.5, -0.5,
+        -0.5, -0.5, -0.5,   0.5, -0.5, -0.5,   0.5, -0.5,  0.5,  -0.5, -0.5,  0.5,
+         0.5, -0.5, -0.5,   0.5,  0.5, -0.5,   0.5,  0.5,  0.5,   0.5, -0.5,  0.5,
+        -0.5, -0.5, -0.5,  -0.5, -0.5,  0.5,  -0.5,  0.5,  0.5,  -0.5,  0.5, -0.5,
+    ],
+    normals: [ // Standard 1x1x1 cube normals (same as creatureShapes.SHARK.normals)
+         0.0,  0.0,  1.0,   0.0,  0.0,  1.0,   0.0,  0.0,  1.0,   0.0,  0.0,  1.0,
+         0.0,  0.0, -1.0,   0.0,  0.0, -1.0,   0.0,  0.0, -1.0,   0.0,  0.0, -1.0,
+         0.0,  1.0,  0.0,   0.0,  1.0,  0.0,   0.0,  1.0,  0.0,   0.0,  1.0,  0.0,
+         0.0, -1.0,  0.0,   0.0, -1.0,  0.0,   0.0, -1.0,  0.0,   0.0, -1.0,  0.0,
+         1.0,  0.0,  0.0,   1.0,  0.0,  0.0,   1.0,  0.0,  0.0,   1.0,  0.0,  0.0,
+        -1.0,  0.0,  0.0,  -1.0,  0.0,  0.0,  -1.0,  0.0,  0.0,  -1.0,  0.0,  0.0,
+    ],
+    indices: [ // Standard 1x1x1 cube indices (same as creatureShapes.SHARK.indices)
+        0,  1,  2,    0,  2,  3,    4,  5,  6,    4,  6,  7,
+        8,  9, 10,    8, 10, 11,   12, 13, 14,   12, 14, 15,
+        16, 17, 18,   16, 18, 19,   20, 21, 22,   20, 22, 23,
+    ]
+};
+let flashlightCubeVertexBufferGL, flashlightCubeNormalBufferGL, flashlightCubeIndexBufferGL;
+
 const FLASHLIGHT_MODEL_COLOR = [0.25, 0.25, 0.3, 1.0]; // Dark greyish color
 
 const DUST_COLOR = [0.8, 0.8, 0.7, 0.3]; // Semi-transparent greyish
@@ -504,6 +530,18 @@ window.onload = async function() { // Make it async
     flashlightIndexBufferGL = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, flashlightIndexBufferGL);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(flashlightModel.indices), gl.STATIC_DRAW);
+
+    flashlightCubeVertexBufferGL = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, flashlightCubeVertexBufferGL);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flashlightCubeModel.vertices), gl.STATIC_DRAW);
+
+    flashlightCubeNormalBufferGL = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, flashlightCubeNormalBufferGL);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flashlightCubeModel.normals), gl.STATIC_DRAW);
+
+    flashlightCubeIndexBufferGL = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, flashlightCubeIndexBufferGL);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(flashlightCubeModel.indices), gl.STATIC_DRAW);
 
     // Basic clear color - might be overridden by shader but good for initial setup
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -1049,46 +1087,20 @@ function render(timestamp) {
     }
 
     // --- Render Flashlight Model ---
-    if (isFlashlightOn) {
-        gl.useProgram(creatureShaderProgram); 
-
-        // Set up for additive blending
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.ONE, gl.ONE); // Additive blending (source + destination)
-        // gl.depthMask(false); // God rays typically don't write to depth
-
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, occlusionTexture);
-        gl.uniform1i(uOcclusionTextureLoc, 0); // Texture unit 0
-
-        // Light position on screen (center for now, as light spot is screen-centered)
-        gl.uniform2f(uLightScreenPosLoc, 0.5, 0.5); 
-
-        // Set new god ray parameter uniforms
-        if(uGodRayNumSamplesLoc) gl.uniform1i(uGodRayNumSamplesLoc, godRayParams.numSamples);
-        if(uGodRayDecayLoc) gl.uniform1f(uGodRayDecayLoc, godRayParams.decay);
-        if(uGodRayExposureLoc) gl.uniform1f(uGodRayExposureLoc, godRayParams.exposure);
-        if(uGodRayDensityLoc) gl.uniform1f(uGodRayDensityLoc, godRayParams.density);
-        if(uGodRayWeightLoc) gl.uniform1f(uGodRayWeightLoc, godRayParams.weight);
-
-        const godRayQuadPosLoc = gl.getAttribLocation(godRayShaderProgram, "a_quad_pos");
-        if (godRayQuadPosLoc !== -1) {
-            gl.bindBuffer(gl.ARRAY_BUFFER, lightSpotQuadVBO); // Reuse quad VBO
-            gl.vertexAttribPointer(godRayQuadPosLoc, 2, gl.FLOAT, false, 0, 0);
-            gl.enableVertexAttribArray(godRayQuadPosLoc);
-            
-            gl.drawArrays(gl.TRIANGLES, 0, 6);
-            
-            gl.disableVertexAttribArray(godRayQuadPosLoc);
-        }
-        
-        gl.disable(gl.BLEND); // Reset blend mode
-        // gl.depthMask(true); // Reset depth mask if it was changed
-    }
+    // This section is now for rendering the flashlight model itself, using creatureShaderProgram.
+    // The misplaced God Ray pass that was here has been removed.
+    // The actual flashlight model rendering code is below, currently under a misleading comment.
+    // For clarity, the flashlight model rendering part using creatureShaderProgram should be here.
+    // However, the task is specific about removing the misplaced God Ray code first.
+    // The flashlight model rendering will be handled by the existing code block
+    // that starts around line 1095 (formerly "God Ray Rendering Pass (moved after flashlight model)")
+    // which correctly uses creatureShaderProgram for the flashlight model.
 
     // --- God Ray Rendering Pass (moved after flashlight model) ---
+    // This comment is misleading. This section below actually renders the FLASHLIGHT MODEL.
+    // The ACTUAL God Ray pass is further down.
     if (isFlashlightOn && godRayShaderProgram && occlusionTexture && uOcclusionTextureLoc && uLightScreenPosLoc) {
-        gl.useProgram(godRayShaderProgram);
+        gl.useProgram(creatureShaderProgram); // This should be creatureShaderProgram for the flashlight model
 
         // Set all necessary uniforms for creatureShaderProgram
         gl.uniformMatrix4fv(uCreatureViewMatrixLoc, false, viewMatrix);
@@ -1117,16 +1129,16 @@ function render(timestamp) {
 
         // Flashlight Model Attributes Setup
         if (creaturePosAttrLoc !== -1 && typeof creaturePosAttrLoc !== 'undefined') { 
-            gl.bindBuffer(gl.ARRAY_BUFFER, flashlightVertexBufferGL);
+            gl.bindBuffer(gl.ARRAY_BUFFER, flashlightCubeVertexBufferGL);
             gl.vertexAttribPointer(creaturePosAttrLoc, 3, gl.FLOAT, false, 0, 0);
             gl.enableVertexAttribArray(creaturePosAttrLoc);
         }
         if (aCreatureVertexNormalLoc !== -1 && typeof aCreatureVertexNormalLoc !== 'undefined') {
-            gl.bindBuffer(gl.ARRAY_BUFFER, flashlightNormalBufferGL);
+            gl.bindBuffer(gl.ARRAY_BUFFER, flashlightCubeNormalBufferGL);
             gl.vertexAttribPointer(aCreatureVertexNormalLoc, 3, gl.FLOAT, false, 0, 0);
             gl.enableVertexAttribArray(aCreatureVertexNormalLoc);
         }
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, flashlightIndexBufferGL);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, flashlightCubeIndexBufferGL);
 
         // Construct Model Matrix for the flashlight
         let flashlightModelMatrix = glMatrix.mat4.create();
@@ -1171,12 +1183,12 @@ function render(timestamp) {
         glMatrix.mat4.rotateX(rotationX, rotationX, -Math.PI / 2);
         glMatrix.mat4.multiply(flashlightModelMatrix, flashlightModelMatrix, rotationX);
 
-        glMatrix.mat4.scale(flashlightModelMatrix, flashlightModelMatrix, [0.020, 0.15, 0.020]); // XZ radius, Y length (now points forward)
+        glMatrix.mat4.scale(flashlightModelMatrix, flashlightModelMatrix, [0.05, 0.05, 0.15]); // Small cube: width, height, length
 
         gl.uniformMatrix4fv(uCreatureModelMatrixLoc, false, flashlightModelMatrix);
         gl.uniform3fv(uMaterialDiffuseColorLoc, FLASHLIGHT_MODEL_COLOR.slice(0,3));
 
-        gl.drawElements(gl.TRIANGLES, flashlightModel.indices.length, gl.UNSIGNED_SHORT, 0);
+        gl.drawElements(gl.TRIANGLES, flashlightCubeModel.indices.length, gl.UNSIGNED_SHORT, 0);
 
         // Disable attributes after use if they were enabled specifically for this model
         if (creaturePosAttrLoc !== -1 && typeof creaturePosAttrLoc !== 'undefined') {
@@ -1202,6 +1214,12 @@ function render(timestamp) {
 
         // Light position on screen (center for now, as light spot is screen-centered)
         gl.uniform2f(uLightScreenPosLoc, 0.5, 0.5); 
+
+        if(uGodRayNumSamplesLoc) gl.uniform1i(uGodRayNumSamplesLoc, godRayParams.numSamples);
+        if(uGodRayDecayLoc) gl.uniform1f(uGodRayDecayLoc, godRayParams.decay);
+        if(uGodRayExposureLoc) gl.uniform1f(uGodRayExposureLoc, godRayParams.exposure);
+        if(uGodRayDensityLoc) gl.uniform1f(uGodRayDensityLoc, godRayParams.density);
+        if(uGodRayWeightLoc) gl.uniform1f(uGodRayWeightLoc, godRayParams.weight);
 
         const godRayQuadPosLoc = gl.getAttribLocation(godRayShaderProgram, "a_quad_pos");
         if (godRayQuadPosLoc !== -1) {
