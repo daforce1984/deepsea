@@ -139,6 +139,13 @@ glMatrix.vec3 = {
         out[1] = az * bx - ax * bz;
         out[2] = ax * by - ay * bx;
         return out;
+    },
+    clone: function(a) {
+        let out = new Float32Array(3);
+        out[0] = a[0];
+        out[1] = a[1];
+        out[2] = a[2];
+        return out;
     }
 };
 
