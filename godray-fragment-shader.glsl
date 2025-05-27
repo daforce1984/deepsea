@@ -27,7 +27,7 @@ void main() {
     // Let's try making NUM_SAMPLES a uniform int. Max loop count might be implementation defined.
     // If it causes issues, it can be reverted to const.
     
-    deltaTexCoord *= 1.0 / float(max(1, u_num_samples)) * u_density; // Use max(1,...) for safety
+    deltaTexCoord *= 1.0 / max(1.0, float(u_num_samples)) * u_density; // Use max(1,...) for safety
 
     float illuminationDecay = 1.0;
     vec4 color = vec4(0.0);
