@@ -14,6 +14,8 @@ uniform float u_exposure;
 uniform float u_density;
 uniform float u_weight;
 
+const int MAX_SHADER_SAMPLES = 128;
+
 void main() {
     vec2 deltaTexCoord = v_texCoord - u_lightScreenPos;
     // Ensure u_num_samples is not zero to prevent division by zero if passed as such.
@@ -32,7 +34,10 @@ void main() {
     float illuminationDecay = 1.0;
     vec4 color = vec4(0.0);
 
-    for (int i = 0; i < u_num_samples; i++) { // Loop with uniform
+    for (int i = 0; i < MAX_SHADER_SAMPLES; i++) { // Loop with uniform
+        if (i >= u_num_samples) {
+            break;
+        }
         vec2 currentTexCoord = u_lightScreenPos + deltaTexCoord * float(i);
         // Check if currentTexCoord is within texture bounds (0..1)
         if (currentTexCoord.x < 0.0 || currentTexCoord.x > 1.0 ||
