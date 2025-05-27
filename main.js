@@ -74,37 +74,23 @@ const godRayParams = { // Default values for god ray parameters
 };
 
 // Flashlight Model Global Variables
-let flashlightModel = {
+let flashlightModel = { // This will be deprecated by loadedGLBData
     vertices: [],
     normals: [],
     indices: []
 };
 let flashlightVertexBufferGL, flashlightNormalBufferGL, flashlightIndexBufferGL;
 
-let flashlightCubeModel = {
-    vertices: [ // Standard 1x1x1 cube vertices (same as creatureShapes.SHARK.vertices)
-        -0.5, -0.5,  0.5,   0.5, -0.5,  0.5,   0.5,  0.5,  0.5,  -0.5,  0.5,  0.5,
-        -0.5, -0.5, -0.5,  -0.5,  0.5, -0.5,   0.5,  0.5, -0.5,   0.5, -0.5, -0.5,
-        -0.5,  0.5, -0.5,  -0.5,  0.5,  0.5,   0.5,  0.5,  0.5,   0.5,  0.5, -0.5,
-        -0.5, -0.5, -0.5,   0.5, -0.5, -0.5,   0.5, -0.5,  0.5,  -0.5, -0.5,  0.5,
-         0.5, -0.5, -0.5,   0.5,  0.5, -0.5,   0.5,  0.5,  0.5,   0.5, -0.5,  0.5,
-        -0.5, -0.5, -0.5,  -0.5, -0.5,  0.5,  -0.5,  0.5,  0.5,  -0.5,  0.5, -0.5,
-    ],
-    normals: [ // Standard 1x1x1 cube normals (same as creatureShapes.SHARK.normals)
-         0.0,  0.0,  1.0,   0.0,  0.0,  1.0,   0.0,  0.0,  1.0,   0.0,  0.0,  1.0,
-         0.0,  0.0, -1.0,   0.0,  0.0, -1.0,   0.0,  0.0, -1.0,   0.0,  0.0, -1.0,
-         0.0,  1.0,  0.0,   0.0,  1.0,  0.0,   0.0,  1.0,  0.0,   0.0,  1.0,  0.0,
-         0.0, -1.0,  0.0,   0.0, -1.0,  0.0,   0.0, -1.0,  0.0,   0.0, -1.0,  0.0,
-         1.0,  0.0,  0.0,   1.0,  0.0,  0.0,   1.0,  0.0,  0.0,   1.0,  0.0,  0.0,
-        -1.0,  0.0,  0.0,  -1.0,  0.0,  0.0,  -1.0,  0.0,  0.0,  -1.0,  0.0,  0.0,
-    ],
-    indices: [ // Standard 1x1x1 cube indices (same as creatureShapes.SHARK.indices)
-        0,  1,  2,    0,  2,  3,    4,  5,  6,    4,  6,  7,
-        8,  9, 10,    8, 10, 11,   12, 13, 14,   12, 14, 15,
-        16, 17, 18,   16, 18, 19,   20, 21, 22,   20, 22, 23,
-    ]
+// Global object to store loaded GLB data
+let loadedGLBData = {
+    vertices: null,
+    normals: null,
+    indices: null,
+    indexType: null // Will store gl.UNSIGNED_SHORT or gl.UNSIGNED_INT
 };
-let flashlightCubeVertexBufferGL, flashlightCubeNormalBufferGL, flashlightCubeIndexBufferGL;
+
+// let flashlightCubeModel = { ... }; // REMOVED
+// let flashlightCubeVertexBufferGL, flashlightCubeNormalBufferGL, flashlightCubeIndexBufferGL; // REMOVED
 
 const FLASHLIGHT_MODEL_COLOR = [0.25, 0.25, 0.3, 1.0]; // Dark greyish color
 
@@ -118,7 +104,7 @@ let cameraPitch = 0;          // Initial pitch
 const mouseSensitivity = 0.002;
 
 // Flashlight Variables
-let isFlashlightOn = false; // Flashlight is off by default
+let isFlashlightOn = true; // Flashlight is ON by default
 const flashlightColor = [1.0, 1.0, 0.9]; // Slightly warm white
 const flashlightIntensity = 1.5;          // Multiplier for flashlight brightness
 const flashlightConeAngle = 25.0 * Math.PI / 180; // Inner cone angle (degrees to radians)
@@ -137,7 +123,7 @@ let uMaterialDiffuseColorLoc, uLightPositionLoc, uLightColorLoc, uCameraPosition
 let aCreatureVertexNormalLoc; // Attribute location for normals
 
 const lightPosition = [50.0, 50.0, 100.0]; // Example static light position in world space
-const lightColor = [1.0, 1.0, 1.0];       // White light
+const lightColor = [0.01, 0.01, 0.01];       // White light
 const ambientLightColor = [0.2, 0.2, 0.3]; // Dim ambient bluish light
 const materialShininess = 32.0;
 let canvas;
@@ -261,7 +247,231 @@ function initShaderProgram(gl, vsSource, fsSource) {
     return shaderProgram;
 }
 
-function generateCylinder(radius, height, segments) {
+async function loadGLB(filePath) {
+    try {
+        const response = await fetch(filePath);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+
+        const dataView = new DataView(arrayBuffer);
+        const magic = dataView.getUint32(0, true); // Little-endian
+        if (magic !== 0x46546C67) { // 'glTF'
+            console.error('Invalid GLB magic string.');
+            return;
+        }
+
+        const version = dataView.getUint32(4, true);
+        if (version !== 2) {
+            console.warn(`GLB version is ${version}, expected 2. Attempting to parse anyway.`);
+        }
+        // const totalLength = dataView.getUint32(8, true); // Not strictly needed for this parser
+
+        let chunkOffset = 12; // Start after header
+        let jsonContent, binBuffer;
+
+        while (chunkOffset < arrayBuffer.byteLength) {
+            const chunkLength = dataView.getUint32(chunkOffset, true);
+            chunkOffset += 4;
+            const chunkType = dataView.getUint32(chunkOffset, true);
+            chunkOffset += 4;
+
+            if (chunkType === 0x4E4F534A) { // JSON
+                const jsonChunk = new Uint8Array(arrayBuffer, chunkOffset, chunkLength);
+                const jsonString = new TextDecoder('utf-8').decode(jsonChunk);
+                jsonContent = JSON.parse(jsonString);
+            } else if (chunkType === 0x004E4942) { // BIN
+                binBuffer = arrayBuffer.slice(chunkOffset, chunkOffset + chunkLength);
+            }
+            chunkOffset += chunkLength;
+        }
+
+        if (!jsonContent || !binBuffer) {
+            console.error('GLB parsing error: JSON or BIN chunk not found.');
+            return;
+        }
+
+        // Assuming the first mesh and its first primitive
+        const mesh = jsonContent.meshes[0];
+        const primitive = mesh.primitives[0];
+
+        // Accessor component type mapping
+        const componentTypeMap = {
+            5120: Int8Array,    // BYTE
+            5121: Uint8Array,   // UNSIGNED_BYTE
+            5122: Int16Array,   // SHORT
+            5123: Uint16Array,  // UNSIGNED_SHORT
+            5125: Uint32Array,  // UNSIGNED_INT
+            5126: Float32Array  // FLOAT
+        };
+        const componentsPerType = {
+            'SCALAR': 1, 'VEC2': 2, 'VEC3': 3, 'VEC4': 4, 'MAT2': 4, 'MAT3': 9, 'MAT4': 16
+        };
+
+        function getAccessorData(accessorIndex) {
+            const accessor = jsonContent.accessors[accessorIndex];
+            const bufferView = jsonContent.bufferViews[accessor.bufferView];
+            const componentType = componentTypeMap[accessor.componentType];
+            const numComponents = componentsPerType[accessor.type];
+            const count = accessor.count; // Number of elements (e.g., number of VEC3s)
+            
+            const byteOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
+            // byteLength for this accessor's data within the bufferView
+            // const byteLength = accessor.count * numComponents * componentType.BYTES_PER_ELEMENT; 
+            // Note: Using bufferView.byteLength is more robust if accessor doesn't span the whole view.
+            // However, for this case, we will extract based on accessor.count and component size.
+
+            const data = new componentType(binBuffer, byteOffset, count * numComponents);
+            return data;
+        }
+
+        const positionAccessorIndex = primitive.attributes.POSITION;
+        const normalAccessorIndex = primitive.attributes.NORMAL;
+        const indicesAccessorIndex = primitive.indices;
+
+        loadedGLBData.vertices = getAccessorData(positionAccessorIndex);
+        loadedGLBData.normals = getAccessorData(normalAccessorIndex);
+        loadedGLBData.indices = getAccessorData(indicesAccessorIndex);
+        
+        // Ensure indices are of the correct type for drawElements (Uint16Array or Uint32Array)
+        // The getAccessorData function already returns the correct TypedArray based on componentType.
+        // For example, if indices are UNSIGNED_SHORT (5123), it will return Uint16Array.
+        // If they are UNSIGNED_INT (5125), it will return Uint32Array.
+        // WebGL requires indices to be Uint16Array or Uint32Array (with OES_element_index_uint extension for the latter).
+        const indicesAccessor = jsonContent.accessors[indicesAccessorIndex];
+        if (indicesAccessor.componentType === 5123) { // UNSIGNED_SHORT
+            loadedGLBData.indexType = gl.UNSIGNED_SHORT;
+        } else if (indicesAccessor.componentType === 5125) { // UNSIGNED_INT
+            loadedGLBData.indexType = gl.UNSIGNED_INT;
+            // Check for OES_element_index_uint extension if using UNSIGNED_INT
+            if (!gl.getExtension('OES_element_index_uint')) {
+                console.warn("OES_element_index_uint extension not supported. GLB indices might not render correctly if they are UNSIGNED_INT.");
+            }
+        } else {
+            console.error("Unsupported index component type:", indicesAccessor.componentType);
+            // Fallback or throw error
+            loadedGLBData.indexType = gl.UNSIGNED_SHORT; // Default fallback
+        }
+
+
+        console.log('GLB loaded and parsed:', loadedGLBData);
+
+    } catch (error) {
+        console.error('Error loading or parsing GLB:', error);
+        loadedGLBData.vertices = new Float32Array(0); // Empty arrays as fallback
+        loadedGLBData.normals = new Float32Array(0);
+        loadedGLBData.indices = new Uint16Array(0);
+        loadedGLBData.indexType = gl.UNSIGNED_SHORT;
+    }
+}
+
+// function generateCylinder(radius, height, segments) { // REMOVED
+//     let vertices = []; let normals = []; let indices = [];
+//     const halfHeight = height / 2;
+
+//     // Side vertices and normals
+//     for (let i = 0; i <= segments; i++) {
+//         const angle = (i / segments) * Math.PI * 2;
+//         const x = Math.cos(angle) * radius; 
+//         const z = Math.sin(angle) * radius;
+//         vertices.push(x, halfHeight, z); normals.push(x/radius, 0, z/radius);
+//         vertices.push(x, -halfHeight, z); normals.push(x/radius, 0, z/radius);
+//     }
+//     // Side indices
+//     for (let i = 0; i < segments; i++) {
+//         const p1 = i * 2;     const p2 = i * 2 + 1;
+//         const p3 = (i + 1) * 2; const p4 = (i + 1) * 2 + 1;
+//         indices.push(p1, p2, p3);
+//         indices.push(p3, p2, p4);
+//     }
+
+//     // Caps
+//     const capVertexBaseIndex = vertices.length / 3; 
+
+//     // Top Cap
+//     vertices.push(0, halfHeight, 0); 
+//     normals.push(0, 1, 0);
+//     const topCenterIdx = capVertexBaseIndex;
+//     for (let i = 0; i <= segments; i++) { 
+//         const angle = (i / segments) * Math.PI * 2;
+//         const x = Math.cos(angle) * radius; const z = Math.sin(angle) * radius;
+//         vertices.push(x, halfHeight, z); normals.push(0, 1, 0);
+//     }
+//     for (let i = 0; i < segments; i++) {
+//         indices.push(topCenterIdx, capVertexBaseIndex + 1 + i, capVertexBaseIndex + 1 + i + 1);
+//     }
+
+//     // Bottom Cap
+//     const bottomCapBaseIndex = vertices.length / 3; 
+//     vertices.push(0, -halfHeight, 0); 
+//     normals.push(0, -1, 0);
+//     const bottomCenterIdx = bottomCapBaseIndex;
+//     for (let i = 0; i <= segments; i++) { 
+//         const angle = (i / segments) * Math.PI * 2;
+//         const x = Math.cos(angle) * radius; const z = Math.sin(angle) * radius;
+//         vertices.push(x, -halfHeight, z); normals.push(0, -1, 0);
+//     }
+//     for (let i = 0; i < segments; i++) {
+//         indices.push(bottomCenterIdx, bottomCapBaseIndex + 1 + i + 1, bottomCapBaseIndex + 1 + i); 
+//     }
+//     return { vertices, normals, indices };
+// }
+function generateCylinder(radius, height, segments) { // Keep for creatures if needed, or remove if unused.
+    // ... (original cylinder code, if still needed by other parts of the application)
+    // For now, assuming it might be used by something else, so not removing its body.
+    // If it's confirmed to be unused, the entire function can be removed.
+    // For this subtask, we are only removing its call for flashlightModel.
+    let vertices = []; let normals = []; let indices = [];
+    const halfHeight = height / 2;
+
+    // Side vertices and normals
+    for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        const x = Math.cos(angle) * radius; 
+        const z = Math.sin(angle) * radius;
+        vertices.push(x, halfHeight, z); normals.push(x/radius, 0, z/radius);
+        vertices.push(x, -halfHeight, z); normals.push(x/radius, 0, z/radius);
+    }
+    // Side indices
+    for (let i = 0; i < segments; i++) {
+        const p1 = i * 2;     const p2 = i * 2 + 1;
+        const p3 = (i + 1) * 2; const p4 = (i + 1) * 2 + 1;
+        indices.push(p1, p2, p3);
+        indices.push(p3, p2, p4);
+    }
+
+    // Caps
+    const capVertexBaseIndex = vertices.length / 3; 
+
+    // Top Cap
+    vertices.push(0, halfHeight, 0); 
+    normals.push(0, 1, 0);
+    const topCenterIdx = capVertexBaseIndex;
+    for (let i = 0; i <= segments; i++) { 
+        const angle = (i / segments) * Math.PI * 2;
+        const x = Math.cos(angle) * radius; const z = Math.sin(angle) * radius;
+        vertices.push(x, halfHeight, z); normals.push(0, 1, 0);
+    }
+    for (let i = 0; i < segments; i++) {
+        indices.push(topCenterIdx, capVertexBaseIndex + 1 + i, capVertexBaseIndex + 1 + i + 1);
+    }
+
+    // Bottom Cap
+    const bottomCapBaseIndex = vertices.length / 3; 
+    vertices.push(0, -halfHeight, 0); 
+    normals.push(0, -1, 0);
+    const bottomCenterIdx = bottomCapBaseIndex;
+    for (let i = 0; i <= segments; i++) { 
+        const angle = (i / segments) * Math.PI * 2;
+        const x = Math.cos(angle) * radius; const z = Math.sin(angle) * radius;
+        vertices.push(x, -halfHeight, z); normals.push(0, -1, 0);
+    }
+    for (let i = 0; i < segments; i++) {
+        indices.push(bottomCenterIdx, bottomCapBaseIndex + 1 + i + 1, bottomCapBaseIndex + 1 + i); 
+    }
+    return { vertices, normals, indices };
+}
     let vertices = []; let normals = []; let indices = [];
     const halfHeight = height / 2;
 
@@ -322,6 +532,7 @@ const creatures = {
 
 // Store vertex data for each creature type.
 // All creatures are now 3D cubes with normals and indices.
+// The generateCylinder function might be used here or for other future shapes.
 const creatureShapes = {
     [creatures.SHARK]: { // Will be a cube
         vertices: [ // Cube vertices (a 1x1x1 cube centered at origin)
@@ -407,6 +618,9 @@ window.onload = async function() { // Make it async
 
     gl.enable(gl.DEPTH_TEST); // Enable depth testing
     gl.depthFunc(gl.LEQUAL);    // Near things obscure far things
+
+    // Load GLB model for flashlight
+    await loadGLB('flashlight.glb');
 
     // Enable WEBGL_depth_texture extension
     const depthTextureExtension = gl.getExtension('WEBGL_depth_texture');
@@ -655,32 +869,42 @@ window.onload = async function() { // Make it async
         end: uFogEndDistanceLoc 
     });
 
-    // Initialize Flashlight Model
-    flashlightModel = generateCylinder(1.0, 1.0, 16); // Unit cylinder (radius 1, height 1)
+    // Initialize Flashlight Model Buffers from loadedGLBData
+    // flashlightModel = generateCylinder(1.0, 1.0, 16); // REMOVED - Replaced by GLB
 
-    flashlightVertexBufferGL = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, flashlightVertexBufferGL);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flashlightModel.vertices), gl.STATIC_DRAW);
-
+    flashlightVertexBufferGL = gl.createBuffer(); // Ensure these are declared globally
     flashlightNormalBufferGL = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, flashlightNormalBufferGL);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flashlightModel.normals), gl.STATIC_DRAW);
-
     flashlightIndexBufferGL = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, flashlightIndexBufferGL);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(flashlightModel.indices), gl.STATIC_DRAW);
 
-    flashlightCubeVertexBufferGL = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, flashlightCubeVertexBufferGL);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flashlightCubeModel.vertices), gl.STATIC_DRAW);
+    if (loadedGLBData.vertices && loadedGLBData.normals && loadedGLBData.indices) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, flashlightVertexBufferGL);
+        gl.bufferData(gl.ARRAY_BUFFER, loadedGLBData.vertices, gl.STATIC_DRAW);
 
-    flashlightCubeNormalBufferGL = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, flashlightCubeNormalBufferGL);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flashlightCubeModel.normals), gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, flashlightNormalBufferGL);
+        gl.bufferData(gl.ARRAY_BUFFER, loadedGLBData.normals, gl.STATIC_DRAW);
 
-    flashlightCubeIndexBufferGL = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, flashlightCubeIndexBufferGL);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(flashlightCubeModel.indices), gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, flashlightIndexBufferGL);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, loadedGLBData.indices, gl.STATIC_DRAW);
+        console.log("Flashlight GLB data buffered to GPU.");
+    } else {
+        console.error("Flashlight GLB data not loaded correctly, buffers not set.");
+        // As a fallback, you might want to fill with minimal data to prevent WebGL errors
+        // For example, a single point or triangle, or just leave them empty if render path handles it.
+        // For now, relying on the error console log.
+    }
+
+    // flashlightCubeVertexBufferGL = gl.createBuffer(); // REMOVED
+    // gl.bindBuffer(gl.ARRAY_BUFFER, flashlightCubeVertexBufferGL); // REMOVED
+    // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flashlightCubeModel.vertices), gl.STATIC_DRAW); // REMOVED
+
+    // flashlightCubeNormalBufferGL = gl.createBuffer(); // REMOVED
+    // gl.bindBuffer(gl.ARRAY_BUFFER, flashlightCubeNormalBufferGL); // REMOVED
+    // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flashlightCubeModel.normals), gl.STATIC_DRAW); // REMOVED
+
+    // flashlightCubeIndexBufferGL = gl.createBuffer(); // REMOVED
+    // gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, flashlightCubeIndexBufferGL); // REMOVED
+    // gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(flashlightCubeModel.indices), gl.STATIC_DRAW); // REMOVED
+
 
     // Basic clear color - might be overridden by shader but good for initial setup
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -1377,17 +1601,19 @@ function render(timestamp) {
         if (uFlashlightOuterConeCosLoc) gl.uniform1f(uFlashlightOuterConeCosLoc, Math.cos(flashlightOuterConeAngle));
 
         // Flashlight Model Attributes Setup
-        if (creaturePosAttrLoc !== -1 && typeof creaturePosAttrLoc !== 'undefined') { 
-            gl.bindBuffer(gl.ARRAY_BUFFER, flashlightCubeVertexBufferGL);
+        if (creaturePosAttrLoc !== -1 && typeof creaturePosAttrLoc !== 'undefined' && flashlightVertexBufferGL) { 
+            gl.bindBuffer(gl.ARRAY_BUFFER, flashlightVertexBufferGL); // Use GLB vertex buffer
             gl.vertexAttribPointer(creaturePosAttrLoc, 3, gl.FLOAT, false, 0, 0);
             gl.enableVertexAttribArray(creaturePosAttrLoc);
         }
-        if (aCreatureVertexNormalLoc !== -1 && typeof aCreatureVertexNormalLoc !== 'undefined') {
-            gl.bindBuffer(gl.ARRAY_BUFFER, flashlightCubeNormalBufferGL);
+        if (aCreatureVertexNormalLoc !== -1 && typeof aCreatureVertexNormalLoc !== 'undefined' && flashlightNormalBufferGL) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, flashlightNormalBufferGL); // Use GLB normal buffer
             gl.vertexAttribPointer(aCreatureVertexNormalLoc, 3, gl.FLOAT, false, 0, 0);
             gl.enableVertexAttribArray(aCreatureVertexNormalLoc);
         }
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, flashlightCubeIndexBufferGL);
+        if (flashlightIndexBufferGL) {
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, flashlightIndexBufferGL); // Use GLB index buffer
+        }
 
         // Construct Model Matrix for the flashlight
         let flashlightModelMatrix = glMatrix.mat4.create();
@@ -1432,12 +1658,16 @@ function render(timestamp) {
         glMatrix.mat4.rotateX(rotationX, rotationX, -Math.PI / 2);
         glMatrix.mat4.multiply(flashlightModelMatrix, flashlightModelMatrix, rotationX);
 
-        glMatrix.mat4.scale(flashlightModelMatrix, flashlightModelMatrix, [0.05, 0.05, 0.15]); // Small cube: width, height, length
+        glMatrix.mat4.scale(flashlightModelMatrix, flashlightModelMatrix, [0.05, 0.05, 0.15]); // Keep existing scale for now
 
         gl.uniformMatrix4fv(uCreatureModelMatrixLoc, false, flashlightModelMatrix);
         gl.uniform3fv(uMaterialDiffuseColorLoc, FLASHLIGHT_MODEL_COLOR.slice(0,3));
 
-        gl.drawElements(gl.TRIANGLES, flashlightCubeModel.indices.length, gl.UNSIGNED_SHORT, 0);
+        if (loadedGLBData.indices && loadedGLBData.indices.length > 0 && loadedGLBData.indexType) {
+            gl.drawElements(gl.TRIANGLES, loadedGLBData.indices.length, loadedGLBData.indexType, 0);
+        } else {
+            // console.warn("Flashlight GLB data not available for rendering or indexType not set.");
+        }
 
         // Disable attributes after use if they were enabled specifically for this model
         if (creaturePosAttrLoc !== -1 && typeof creaturePosAttrLoc !== 'undefined') {
