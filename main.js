@@ -792,65 +792,6 @@ window.onload = async function() { // Make it async
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quadVertices), gl.STATIC_DRAW);
     // --- End FBO and Light Spot Shader Init ---
 
-
-    // --- Initialize FBO, Occlusion Texture, Light Spot Shader, and VBO ---
-    occlusionFBO = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, occlusionFBO);
-
-    occlusionTexture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, occlusionTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, occlusionTexture, 0);
-
-    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
-        console.error("Framebuffer setup failed: " + gl.checkFramebufferStatus(gl.FRAMEBUFFER));
-        alert("Error: Framebuffer setup failed for post-processing.");
-    }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null); // Unbind FBO
-
-    // Simple shader for drawing the light spot
-    const lightSpotVS = `
-        attribute vec2 a_quad_pos; // Simple quad -1 to 1
-        uniform mat4 u_viewProjectionMatrix; // To place the spot in the world (if needed)
-                                            // Or just use it for screen space quad if spot is screen-aligned
-        varying vec2 v_texCoord;
-        void main() {
-            gl_Position = vec4(a_quad_pos, 0.0, 1.0); // Fullscreen quad for screen-space spot
-            v_texCoord = a_quad_pos * 0.5 + 0.5; // Convert -1..1 to 0..1
-        }`;
-    const lightSpotFS = `
-        precision mediump float;
-        varying vec2 v_texCoord;
-        uniform vec3 u_light_spot_color; // Color of the spot
-        uniform float u_aspect_ratio;    // canvas.width / canvas.height
-        void main() {
-            vec2 centered_coord = v_texCoord - vec2(0.5); // -0.5 to 0.5
-            centered_coord.x *= u_aspect_ratio; // Correct for aspect ratio to make circle round
-            float dist = length(centered_coord);
-            float intensity = smoothstep(0.4, 0.05, dist); // Soft circular spot
-            gl_FragColor = vec4(u_light_spot_color * intensity, 1.0);
-        }`;
-    lightSpotShaderProgram = initShaderProgram(gl, lightSpotVS, lightSpotFS);
-    if (lightSpotShaderProgram) {
-        uLightSpot_ViewProjectionMatrixLoc = gl.getUniformLocation(lightSpotShaderProgram, "u_viewProjectionMatrix");
-        uLightSpot_ColorLoc = gl.getUniformLocation(lightSpotShaderProgram, "u_light_spot_color");
-        uLightSpot_AspectRatioLoc = gl.getUniformLocation(lightSpotShaderProgram, "u_aspect_ratio");
-        console.log("Light Spot Shader Program and uniforms initialized: ", {vp: uLightSpot_ViewProjectionMatrixLoc, color: uLightSpot_ColorLoc, aspect: uLightSpot_AspectRatioLoc});
-    } else {
-        console.error("Failed to initialize Light Spot Shader Program.");
-    }
-
-    // VBO for a fullscreen quad (used by light spot shader and later god ray shader)
-    const quadVertices = [-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1];
-    lightSpotQuadVBO = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, lightSpotQuadVBO);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quadVertices), gl.STATIC_DRAW);
-    // --- End FBO and Light Spot Shader Init ---
-
     // --- Initialize God Ray Shader Program ---
     try {
         const godRayVS_src = await fetch('godray-vertex-shader.glsl').then(res => res.text());
