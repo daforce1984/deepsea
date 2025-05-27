@@ -131,6 +131,14 @@ glMatrix.vec3 = {
         out[1] = a[1] + b[1] * scale;
         out[2] = a[2] + b[2] * scale;
         return out;
+    },
+    cross: function(out, a, b) {
+        let ax = a[0], ay = a[1], az = a[2];
+        let bx = b[0], by = b[1], bz = b[2];
+        out[0] = ay * bz - az * by;
+        out[1] = az * bx - ax * bz;
+        out[2] = ax * by - ay * bx;
+        return out;
     }
 };
 
