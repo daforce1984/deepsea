@@ -1057,6 +1057,10 @@ function render(timestamp) {
 
     // Draw the seabox
     gl.drawElements(gl.TRIANGLES, seaboxIndices.length, gl.UNSIGNED_SHORT, 0);
+
+    if (seaboxPositionAttributeLocation !== -1 && typeof seaboxPositionAttributeLocation !== 'undefined') {
+      gl.disableVertexAttribArray(seaboxPositionAttributeLocation);
+    }
     
     gl.depthMask(true); // Re-enable depth writing for other objects
     // gl.disableVertexAttribArray(seaboxPositionAttributeLocation); // Consider if creature shader uses 'a_position'
@@ -1093,15 +1097,13 @@ function render(timestamp) {
     gl.uniformMatrix4fv(uCreatureViewMatrixLoc, false, viewMatrix);
     gl.uniformMatrix4fv(uCreatureProjectionMatrixLoc, false, projectionMatrix);
 
-    // Enable vertex attributes
-    // const creaturePosAttrLoc = gl.getAttribLocation(creatureShaderProgram, "a_creature_position"); // Now global
+    // Enable vertex attributes before the loop
     if (creaturePosAttrLoc !== -1 && typeof creaturePosAttrLoc !== 'undefined') { // Check if valid before enabling
         gl.enableVertexAttribArray(creaturePosAttrLoc);
     }
     if (aCreatureVertexNormalLoc !== -1 && typeof aCreatureVertexNormalLoc !== 'undefined') { // Check if normal attribute exists
       gl.enableVertexAttribArray(aCreatureVertexNormalLoc);
     }
-
 
     for (let i = activeCreatures.length - 1; i >= 0; i--) {
         const creature = activeCreatures[i];
@@ -1168,11 +1170,13 @@ function render(timestamp) {
         // 4. Draw the creature
         gl.drawElements(gl.TRIANGLES, creatureDef.indices.length, gl.UNSIGNED_SHORT, 0);
     }
-    // It's good practice to disable arrays after the loop
-    // gl.disableVertexAttribArray(creaturePosAttrLoc);
-    // if (aCreatureVertexNormalLoc !== -1 && aCreatureVertexNormalLoc !== null) {
-    //    gl.disableVertexAttribArray(aCreatureVertexNormalLoc);
-    // }
+    // Disable vertex attributes after the loop
+    if (creaturePosAttrLoc !== -1 && typeof creaturePosAttrLoc !== 'undefined') {
+        gl.disableVertexAttribArray(creaturePosAttrLoc);
+    }
+    if (aCreatureVertexNormalLoc !== -1 && typeof aCreatureVertexNormalLoc !== 'undefined') {
+        gl.disableVertexAttribArray(aCreatureVertexNormalLoc);
+    }
 
     // --- Particle System Logic and Rendering ---
     if (Math.random() < PARTICLE_SPAWN_RATE) { // Probabilistic spawn
