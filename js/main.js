@@ -6,6 +6,8 @@ import { loadGLB } from './gltf.js';
 import { Audio } from './audio.js';
 import { BOAT_S, World, FLOOR_DEPTH, ZONES, waveHeight } from './world.js';
 import { Hands } from './hands.js';
+import { isTouch, initTouch, TOUCH_CSS } from './touch.js';
+import { tr, toggleLang, applyLang } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 const Q = new URLSearchParams(location.search);
@@ -32,6 +34,14 @@ let world, hands;
 const cam = { pos: [0, 2.1, 0], yaw: 0, pitch: 0, vel: [0, 0, 0], fov: 72 * Math.PI / 180, bob: 0 };
 const state = { mode: 'boat', t: 0, frame: 0, torch: false, computer: false, exposure: 0.6, entryT: 0, zone: -1, started: false, fade: 0, flash: 0 };
 const keys = {};
+// phones / tablets: on-screen stick + buttons, lower internal resolution, free look on by default
+const TOUCH = isTouch();
+let touchUpdate = null;
+if (TOUCH) {
+  const st = document.createElement('style'); st.textContent = TOUCH_CSS; document.head.appendChild(st);
+  touchUpdate = initTouch({ cam, state, keys, clamp });
+  state.freeLook = true;
+}
 let prevVP = m4.ident(), prevOrigin = [0, 0, 0];
 window.GAME = { cam, state, R, A, get world() { return world; }, get hands() { return hands; } };
 
@@ -63,7 +73,9 @@ async function boot() {
   for (const m of Object.values(models)) m.images?.forEach((im) => im.close?.());
   if (Q.has('view')) return viewer(models[Q.get('view')]);
   if (Q.has('depth')) { state.mode = 'dive'; cam.pos = [0, -parseFloat(Q.get('depth')), 0]; state.fade = 1; }
-  $('go').textContent = '클릭하여 시작'; $('go').classList.remove('wait');
+  $('go').dataset.t = TOUCH ? '탭하여 시작|Tap to start' : '클릭하여 시작|Click to start';
+  if (TOUCH) $('startNote').dataset.t = '헤드폰 권장 · 가로 화면 · 왼쪽 엄지 이동 · 오른쪽 드래그 시점|Headphones recommended · landscape · left thumb to move · drag right side to look';
+  applyLang(); $('go').classList.remove('wait');
   $('start').addEventListener('click', start);
   $('goFloor').classList.remove('wait');
   $('goFloor').addEventListener('click', (e) => {
@@ -87,13 +99,13 @@ async function start() {
     ['amb_shallow', 'amb_deep', 'amb_abyss'].forEach((n) => A.loop(n, 'amb', 0));
     A.loop('bubbles_loop', 'amb', 0);
     A.setUnderwater(state.mode !== 'boat');
-    tip(state.mode === 'boat' ? '마우스로 둘러보기 · WASD 갑판 이동' : '');
+    tip(state.mode === 'boat' ? (TOUCH ? tr('드래그로 둘러보기 · 왼쪽 엄지로 갑판 이동', 'Drag to look around · left thumb to walk the deck') : tr('마우스로 둘러보기 · WASD 갑판 이동', 'Mouse to look around · WASD to walk the deck')) : '');
     $('entryHint').style.opacity = state.mode === 'boat' ? 1 : 0;
     keysHelp(); lookHud(false);
   }
   lockPointer();
 }
-function lockPointer() { try { const r = canvas.requestPointerLock?.(); r?.catch?.(() => {}); } catch (e) { /* needs a user gesture */ } }
+function lockPointer() { if (TOUCH) return; try { const r = canvas.requestPointerLock?.(); r?.catch?.(() => {}); } catch (e) { /* needs a user gesture */ } }
 canvas.addEventListener('click', () => {
   if (!state.started || state.cine || state.dbg) return;   // cinematic / debug keep the cursor free
   if (document.pointerLockElement !== canvas) lockPointer();
@@ -113,6 +125,11 @@ document.addEventListener('mousemove', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   keys[e.code] = true;
+  if (e.code === 'KeyL') {   // UI language (English default)
+    toggleLang();
+    if (state.started) { keysHelp(); lookHud(false); tip(tr('한국어', 'English'), 1.5); if (state.zone >= 0) { const z = ZONES[state.zone]; $('zone').querySelector('span').textContent = tr(z.sub, z.subEn); } }
+    dbgRender(true);
+  }
   if (!state.started) return;
   if (e.code === 'KeyF' && state.mode !== 'boat') { state.torch = !state.torch; A.play('torch_click', 0.8, { bus: 'helmet' }); }
   if (e.code === 'Space') { e.preventDefault(); if (state.mode !== 'boat') { state.computer = !state.computer; if (state.computer) A.play('hud_beep', 0.35, { bus: 'helmet' }); } else beginEntry(); }
@@ -135,7 +152,7 @@ document.addEventListener('keydown', (e) => {
     }
     if (state.cine && state.mode === 'boat') beginEntry();
   }
-  if (e.code === 'KeyX') { R.aa = !R.aa; tip(R.aa ? '안티에일리어싱 ON (FXAA)' : '안티에일리어싱 OFF', 2); }
+  if (e.code === 'KeyX') { R.aa = !R.aa; tip(R.aa ? tr('안티에일리어싱 ON (FXAA)', 'Anti-aliasing ON (FXAA)') : tr('안티에일리어싱 OFF', 'Anti-aliasing OFF'), 2); }
   if (e.code === 'KeyV') { state.freeLook = !state.freeLook; lookHud(); A.play('hud_beep', 0.25, { bus: 'helmet' }); }
   if (e.code === 'KeyB') { A.setBreath(!A.breathOn); breathHud(); }
   if (e.code === 'BracketRight' || e.code === 'Equal') { A.setBreath(true, A.breathVol + 0.1); breathHud(); }
@@ -150,58 +167,61 @@ function dbgRender(force) {
   if (!state.dbg || !world) return;
   const now = performance.now(); if (!force && now - dbgLast < 250) return; dbgLast = now;
   const depth = Math.max(0, -cam.pos[1]), t = state.t;
-  const fmt = (v) => typeof v === 'number' ? (v <= 0 ? '곧' : v.toFixed(0) + '초 후') : (v || '—');
+  const fmt = (v) => typeof v === 'number' ? (v <= 0 ? tr('곧', 'soon') : tr(v.toFixed(0) + '초 후', 'in ' + v.toFixed(0) + ' s')) : (v || '—');
   const ev = world.eventCatalog(cam.pos, depth, t);
   const B = director.beats || {}, beats = [['bait', 22], ['cutlass', 40], ['whale', 38], ['manta', 48], ['cutlass2', 75], ['shark', 80], ['turtle', 230], ['mega', 340], ['jelly', 520], ['squid', 760], ['angler', 1150]];
   let h = `<h4>DEBUG · ${depth.toFixed(1)} m · ${state.mode}${state.cine ? ' · CINE' : ''}</h4>`;
-  h += `<div class="row"><span>심해 자동 이벤트 (40–75초 주기)</span><span>${depth >= 150 ? fmt(world.evT) + (world.lastEv ? ' · 직전 ' + world.lastEv : '') : '150 m 이하에서'}</span></div>`;
-  h += `<div class="row"><span>얕은 곳 고래쇼</span><span>${depth < 25 ? fmt(world.showT ?? 50) : '25 m 이내에서'}</span></div>`;
-  h += '<h4 style="margin-top:10px">이벤트</h4>';
+  h += `<div class="row"><span>${tr('심해 자동 이벤트 (40–75초 주기)', 'Deep auto events (every 40–75 s)')}</span><span>${depth >= 150 ? fmt(world.evT) + (world.lastEv ? tr(' · 직전 ', ' · last ') + world.lastEv : '') : tr('150 m 이하에서', 'below 150 m')}</span></div>`;
+  h += `<div class="row"><span>${tr('얕은 곳 고래쇼', 'Shallow whale show')}</span><span>${depth < 25 ? fmt(world.showT ?? 50) : tr('25 m 이내에서', 'above 25 m')}</span></div>`;
+  h += `<h4 style="margin-top:10px">${tr('이벤트', 'EVENTS')}</h4>`;
   const far = (d) => d == null ? '' : (d < 15 ? '~' + Math.round(d) : '~' + Math.round(d / 5) * 5) + ' m';   // approximate distance to the animal
   // group by the depth where each event starts; a divider only where a new zone begins
-  const ZONES = [[0, '표층 · 0–200 m'], [200, '중층 · 200–1000 m'], [1000, '심층 · 1000 m –']];
-  const zoneOf = (m) => ZONES.reduce((z, q, k) => (m >= q[0] ? k : z), 0);
+  const BANDS = [[0, tr('표층 · 0–200 m', 'Surface · 0–200 m')], [200, tr('중층 · 200–1000 m', 'Twilight · 200–1000 m')], [1000, tr('심층 · 1000 m –', 'Deep · 1000 m –')]];
+  const zoneOf = (m) => BANDS.reduce((z, q, k) => (m >= q[0] ? k : z), 0);
   const order = ev.map((e, i) => i).sort((a, b) => ev[a].min - ev[b].min || a - b);
   const nowMs = performance.now(); let zone = -1;
   order.forEach((i) => {
     const e = ev[i], z = zoneOf(e.min);
-    if (z !== zone) { zone = z; h += `<div class="zdiv ${zoneOf(depth) === z ? 'here' : ''}">${ZONES[z][1]}${zoneOf(depth) === z ? ' · 현재' : ''}</div>`; }
+    if (z !== zone) { zone = z; h += `<div class="zdiv ${zoneOf(depth) === z ? 'here' : ''}">${BANDS[z][1]}${zoneOf(depth) === z ? tr(' · 현재', ' · here') : ''}</div>`; }
     // button state: running (the event reports it) → pressed and waiting (cue sent, animal on its way) → idle
-    const live = typeof e.eta === 'string' && e.eta.startsWith('진행 중');
+    const live = e.live;
     if (live) delete dbgPressed[e.key];
     const pend = !live && dbgPressed[e.key] && nowMs - dbgPressed[e.key] < 20000;
-    const btn = live ? '진행 중' : pend ? '시작됨…' : '시작';
-    h += `<div class="row ${e.ok ? '' : 'off'} ${live ? 'live' : pend ? 'pend' : ''}"><span>${e.label} <small style="opacity:.6">${e.band || ''}</small></span><span>${e.ok && e.dist != null ? `<b style="color:#8fe">${far(e.dist)}</b> · ` : ''}${e.ok ? fmt(e.eta) : '수심 밖'} <button data-ev="${i}" ${e.ok && !live ? '' : 'disabled'}>${btn}</button></span></div>`;
+    const btn = live ? tr('진행 중', 'Running') : pend ? tr('시작됨…', 'Started…') : tr('시작', 'Start');
+    h += `<div class="row ${e.ok ? '' : 'off'} ${live ? 'live' : pend ? 'pend' : ''}"><span>${e.label} <small style="opacity:.6">${e.band || ''}</small></span><span>${e.ok && e.dist != null ? `<b style="color:#8fe">${far(e.dist)}</b> · ` : ''}${e.ok ? fmt(e.eta) : tr('수심 밖', 'out of range')} <button data-ev="${i}" ${e.ok && !live ? '' : 'disabled'}>${btn}</button></span></div>`;
   });
-  if (state.cine) { h += '<h4 style="margin-top:10px">시네마틱 비트</h4>'; beats.forEach(([k, d]) => { h += `<div class="row ${B[k] ? 'off' : ''}"><span>${k}</span><span>${B[k] ? '완료' : d + ' m'}</span></div>`; }); }
+  if (state.cine) { h += `<h4 style="margin-top:10px">${tr('시네마틱 비트', 'CINEMATIC BEATS')}</h4>`; beats.forEach(([k, d]) => { h += `<div class="row ${B[k] ? 'off' : ''}"><span>${k}</span><span>${B[k] ? tr('완료', 'done') : d + ' m'}</span></div>`; }); }
   const el = $('dbg'); el.innerHTML = h;
-  el.querySelectorAll('button[data-ev]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); const x = world.eventCatalog(cam.pos, Math.max(0, -cam.pos[1]), state.t)[+b.dataset.ev]; if (x && x.ok) { x.fn(); dbgPressed[x.key] = performance.now(); tip('이벤트 시작: ' + x.label, 2); } dbgRender(true); });
+  el.querySelectorAll('button[data-ev]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); const x = world.eventCatalog(cam.pos, Math.max(0, -cam.pos[1]), state.t)[+b.dataset.ev]; if (x && x.ok) { x.fn(); dbgPressed[x.key] = performance.now(); tip(tr('이벤트 시작: ', 'Event started: ') + x.label, 2); } dbgRender(true); });
 }
 function cineHud() {
   $('cine').style.display = state.cine ? '' : 'none';
   document.body.classList.toggle('cine', !!state.cine);
-  tip(state.cine ? '시네마틱 하강 ON — Enter로 해제' : '시네마틱 하강 OFF', 2.5);
+  tip(state.cine ? tr('시네마틱 하강 ON — Enter로 해제', 'Cinematic descent ON — Enter to exit') : tr('시네마틱 하강 OFF', 'Cinematic descent OFF'), 2.5);
 }
 function lookHud(showTip = true) {
   $('look').textContent = state.freeLook ? 'FREE LOOK' : 'LOOK: HORIZONTAL';
   $('look').classList.toggle('on', !!state.freeLook);
-  if (showTip) tip(state.freeLook ? '자유 시점 ON (V)' : '시점 고정: 좌우만 (V로 해제)', 2);
+  if (showTip) tip(state.freeLook ? tr('자유 시점 ON', 'Free look ON') + (TOUCH ? '' : ' (V)') : tr('시점 고정: 좌우만', 'Look locked: horizontal only') + (TOUCH ? '' : tr(' (V로 해제)', ' (V to unlock)')), 2);
 }
 function breathHud() {
   const n = Math.round(A.breathVol * 10);
-  tip(A.breathOn ? `호흡음 ON  ${'▮'.repeat(n)}${'▯'.repeat(10 - n)}  ${Math.round(A.breathVol * 100)}%` : '호흡음 OFF', 2);
+  tip(A.breathOn ? `${tr('호흡음', 'Breathing')} ON  ${'▮'.repeat(n)}${'▯'.repeat(10 - n)}  ${Math.round(A.breathVol * 100)}%` : tr('호흡음 OFF', 'Breathing OFF'), 2);
 }
 function keysHelp() {
-  $('keys').innerHTML = [['WASD', '수영'], ['E / Q', '하강 / 상승'], ['Shift', '추진기 부스트'], ['F', '손전등'], ['Space', '손목 심도계'], ['Enter', '시네마틱 자동 하강'], ['V', '자유 시점 토글'], ['X', '안티에일리어싱 (기본 ON)'], ['B', '호흡음 켜기/끄기'], ['[ / ]', '호흡음 볼륨'], ['M', '음소거'], ['H', '도움말 숨김']]
-    .map(([k, d]) => `<kbd>${k}</kbd>${d}`).join('<br>');
+  $('keys').innerHTML = [['WASD', '수영', 'Swim'], ['E / Q', '하강 / 상승', 'Down / Up'], ['Shift', '추진기 부스트', 'Thruster boost'], ['F', '손전등', 'Torch'], ['Space', '손목 심도계', 'Wrist depth gauge'],
+    ['Enter', '시네마틱 자동 하강', 'Cinematic auto descent'], ['V', '자유 시점 토글', 'Toggle free look'], ['X', '안티에일리어싱 (기본 ON)', 'Anti-aliasing (default ON)'], ['B', '호흡음 켜기/끄기', 'Breathing on/off'],
+    ['[ / ]', '호흡음 볼륨', 'Breathing volume'], ['M', '음소거', 'Mute'], ['L', 'English / 한국어', '한국어 / English'], ['H', '도움말 숨김', 'Hide help']]
+    .map(([k, ko, en]) => `<kbd>${k}</kbd>${tr(ko, en)}`).join('<br>');
 }
 let tipTimer = 0;
+const diveTip = () => TOUCH ? tr('손전등 · 심도계 · ▼ 하강 (≫ 부스트)', 'Torch · Gauge · ▼ descend (≫ boost)') : tr('F 손전등 · Space 손목 심도계 · E 하강 (Shift 부스트)', 'F torch · Space wrist gauge · E descend (Shift boost)');
 function tip(s, dur = 7) { $('tip').textContent = s; $('tip').style.opacity = s ? 1 : 0; tipTimer = dur; }
 
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   const cw = window.innerWidth * dpr, ch = window.innerHeight * dpr;
-  const maxH = parseInt(Q.get('h') || '900');   // higher internal resolution: finer edges (AA)
+  const maxH = parseInt(Q.get('h') || (TOUCH ? '600' : '900'));   // phones: fewer pixels for the mobile GPU   // higher internal resolution: finer edges (AA)
   const s = Math.min(1, maxH / ch);
   R.resize(Math.round(cw * s), Math.round(ch * s));
 }
@@ -369,7 +389,7 @@ function update(dt) {
           A.play('entry_splash', 1.1, { bus: 'helmet' }); setTimeout(() => A.play('entry_under', 0.9), 280);
           world.burst(cam.pos, 220);
         }
-        if (cam.pos[1] < -2.2 || e > walkH + 7) { state.mode = 'dive'; state.entryHigh = null; tip('F 손전등 · Space 손목 심도계 · E 하강 (Shift 부스트)', 9); }
+        if (cam.pos[1] < -2.2 || e > walkH + 7) { state.mode = 'dive'; state.entryHigh = null; tip(diveTip(), 9); }
         cam.pitch = lerp(cam.pitch, cam.pos[1] > 0 ? -0.55 : -0.08, dt * 2);
       }
       let dy = yawOut - cam.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); cam.yaw += dy * Math.min(1, dt * 3);
@@ -393,7 +413,7 @@ function update(dt) {
       }
       if (cam.pos[1] < -2.2 || e > walk + 6) {
         state.mode = 'dive';
-        tip('F 손전등 · Space 손목 심도계 · E 하강 (Shift 부스트)', 9);
+        tip(diveTip(), 9);
       }
     }
     if (!H) { cam.pitch = lerp(cam.pitch, e < walk ? -0.35 : -0.08, dt * 2); cam.yaw = lerp(cam.yaw, 0, dt * 3); }
@@ -402,8 +422,8 @@ function update(dt) {
     const boost = keys.ShiftLeft || keys.ShiftRight ? 9 : 1;
     const acc = [0, 0, 0];
     const add = (v, s) => { acc[0] += v[0] * s; acc[1] += v[1] * s; acc[2] += v[2] * s; };
-    if (keys.KeyW) add(fwd, 1); if (keys.KeyS) add(fwd, -0.6);
-    if (keys.KeyD) add(right, 0.7); if (keys.KeyA) add(right, -0.7);
+    if (keys.KeyW) add(fwd, +keys.KeyW); if (keys.KeyS) add(fwd, -0.6 * keys.KeyS);   // touch stick: analog 0..1, keyboard: true
+    if (keys.KeyD) add(right, 0.7 * keys.KeyD); if (keys.KeyA) add(right, -0.7 * keys.KeyA);
     if (keys.KeyE || keys.KeyC) acc[1] -= 1; if (keys.KeyQ) acc[1] += 1;
     if (state.cine) {
       // cinematic descent: pacing follows the director's mood
@@ -560,7 +580,7 @@ function update(dt) {
 }
 
 function showZone(z) {
-  const el = $('zone'); el.querySelector('b').textContent = z.name; el.querySelector('span').textContent = z.sub;
+  const el = $('zone'); el.querySelector('b').textContent = z.name; el.querySelector('span').textContent = tr(z.sub, z.subEn);
   el.classList.add('show'); clearTimeout(showZone.tm); showZone.tm = setTimeout(() => el.classList.remove('show'), 5200);
   if (A.ctx && state.zone > 0) A.play('sonar', 0.25, { bus: 'helmet' });
 }
@@ -666,6 +686,7 @@ function tick(now) {
   if (now < next - 6) return;
   next += step;
   if (now - next > 250) next = now + step;
+  touchUpdate?.();
   const t0 = performance.now();
   try {
     const u = update(1 / FPS);

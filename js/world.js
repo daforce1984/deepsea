@@ -1,5 +1,6 @@
 // Ocean column: boat & surface, fish schools, manta, sharks, turtle, bioluminescent jellies, deep-sea fish, abyssal floor & crabs.
 import { hullRadii } from './foam.js';
+import { tr } from './i18n.js';
 import { FloorLife } from './floor.js';
 import { DeepLife } from './deeplife.js';
 import { m4, v3, clamp, lerp, smooth, rng, ORIGIN, rel } from './math.js';
@@ -9,10 +10,10 @@ import { GpuSpray } from './spray.js';
 export const FLOOR_DEPTH = 4000;
 export const BOAT_S = 1.15;   // the boat model reads a little small next to the diver: scaled up 15 %
 export const ZONES = [
-  { d: 0, name: 'EPIPELAGIC ZONE', sub: '표층 · 햇빛층  0 – 200 m' },
-  { d: 200, name: 'MESOPELAGIC ZONE', sub: '중층 · 트와일라잇 존  200 – 1,000 m  (햇빛 1% 미만)' },
-  { d: 1000, name: 'BATHYPELAGIC ZONE', sub: '점심해층 · 미드나잇 존  1,000 – 4,000 m  (햇빛 없음)' },
-  { d: 3900, name: 'ABYSSAL PLAIN', sub: '심해저 평원  ~4,000 m · 수온 2°C · 400기압' },
+  { d: 0, name: 'EPIPELAGIC ZONE', sub: '표층 · 햇빛층  0 – 200 m', subEn: 'Sunlight zone  0 – 200 m' },
+  { d: 200, name: 'MESOPELAGIC ZONE', sub: '중층 · 트와일라잇 존  200 – 1,000 m  (햇빛 1% 미만)', subEn: 'Twilight zone  200 – 1,000 m  (under 1% of sunlight)' },
+  { d: 1000, name: 'BATHYPELAGIC ZONE', sub: '점심해층 · 미드나잇 존  1,000 – 4,000 m  (햇빛 없음)', subEn: 'Midnight zone  1,000 – 4,000 m  (no sunlight)' },
+  { d: 3900, name: 'ABYSSAL PLAIN', sub: '심해저 평원  ~4,000 m · 수온 2°C · 400기압', subEn: 'Abyssal plain  ~4,000 m · 2 °C · 400 atm' },
 ];
 export const FACTS = [
   { d: 12, s: '수심 10 m — 적색광 대부분 흡수 (Kd 650nm ≈ 0.36/m)' },
@@ -1712,25 +1713,26 @@ export class World {
   eventCatalog(P, depth, t) {
     const D = depth, L = [], FD = FLOOR_DEPTH;
     // band: depths (m) where it can happen; pos(): where the animal is now (debug shows the approximate distance)
-    const add = (key, label, ok, eta, fn, band = '', pos = null) => { const p = pos && pos(); L.push({ key, label, ok, eta, fn, band, min: key === 'floor' ? FD - 120 : parseFloat(band) || 0, dist: p ? v3.dist(p, P) : null }); };
+    const add = (key, label, ok, eta, fn, band = '', pos = null) => { const p = pos && pos(); L.push({ key, label, ok, eta, fn, band, live: typeof eta === 'string' && eta.startsWith(RUN), min: key === 'floor' ? FD - 120 : parseFloat(band) || 0, dist: p ? v3.dist(p, P) : null }); };
     const nearest = (list, get) => { let b = null, bd = 1e9; for (const x of list || []) { const q = get(x); if (!q) continue; const dd = v3.dist(q, P); if (dd < bd) { bd = dd; b = q; } } return b; };
     const sw = this.swarm, w = this.whale, tu = this.turtle, sq = this.squid, mg = this.mega, oar = this.deepLife?.oar;
-    add('bait', '정어리 군무 (bait ball)', D > 12 && D < 70, sw.active ? '진행 중' : this.events.bait ? this.baitT : '20 m 도달 시', () => { this.startSwarm(P, t); const r = Math.random(); sw.hunter = r < 0.45 ? 'tuna' : r < 0.85 ? 'dolphin' : null; this.baitT = 90 + Math.random() * 90; }, '12–70 m', () => sw.active && sw.center);
-    add('whalePass', '혹등고래 근접 통과', D > 8 && D < 200, w.sw?.pos ? '진행 중' : w.wait, () => { w.closeNext = true; w.wait = 0; if (w.sw) w.sw.pos = null; }, '8–200 m', () => w.sw?.pos);
-    add('whaleShow', '혹등고래 숨쉬기 + 꼬리치기', D < 25, w.ev ? '진행 중: ' + w.ev.st : this.showT ?? 50, () => { this.whaleShowCue = true; w.wait = 0; if (w.sw) w.sw.pos = null; w.ev = null; }, '0–25 m', () => w.sw?.pos);
-    add('manta', '만타 편대', D > 10 && D < 150, this.squad.active ? '진행 중' : this.events.manta ? '1회 완료' : '46 m 도달 시', () => this.startSquadron(P), '10–150 m', () => this.squad.active && this.squad.lead?.pos);
-    add('dolphinPlay', '돌고래 장난 (시야 앞)', D < 45, this.pod.playing > 0 ? '진행 중' : this.pod.playT ?? 20, () => { this.pod.playT = 0; }, '0–45 m', () => this.pod.pos);
-    add('dolphinJump', '돌고래 점프', D < 45, this.pod.playing > 0 ? '진행 중' : '', () => { this.pod.playing = 18; this.dolphins.forEach((d) => { d.breathT = 0.1 + Math.random(); d.surf = 0; d.jumped = false; }); }, '0–45 m', () => this.pod.pos);
-    add('shark', '상어 근접 통과', D > 45 && D < 340, Math.min(...this.sharks.map((s) => s.timer)), () => { this.evClose = 25; this.sharks.forEach((s, i) => { s.timer = 0.5 + i * 6; }); }, '45–340 m', () => nearest(this.sharks, (x) => x.spawned && x.pos));
-    add('turtle', '거대 거북이', D > 180 && D < 420, tu.active ? '진행 중' : tu.wait, () => { tu.active = false; tu.wait = 0; }, '180–420 m', () => tu.active && [tu.c.world[12], tu.c.world[13], tu.c.world[14]]);
-    add('mega', '메갈로돈', D > 250 && D < 1000, mg.active ? '진행 중' : mg.wait, () => { this.megaCue = true; }, '250–1000 m', () => mg.active && mg.pos);
-    add('squid', '대왕오징어', D > 600 && D < 1300, sq.active ? '진행 중' : sq.wait, () => { this.squidCue = true; }, '600–1300 m', () => sq.active && sq.pos);
-    add('oar', '산갈치', D > 150 && D < 1000, oar?.pos ? '진행 중' : oar?.wait ?? 20, () => { if (oar) { oar.pos = null; oar.wait = 0; } this.evClose = 30; }, '150–1000 m', () => oar?.pos);
-    add('jelly', '해파리 근접', D > 420 && D < 1800, '', () => { this.evClose = 22; this.jellyPassT = 0; }, '420–1800 m', null);
-    add('chicken', '머리 없는 닭 괴물', D > 450 && D < 2600, '', () => { const c = this.deepLife.chickens.find((q) => !q.p || this.outOfSight(q.p, P, 1)) || this.deepLife.chickens[0]; c.p = null; this.evClose = 15; }, '450–2600 m', () => nearest(this.deepLife.chickens, (x) => x.p));
-    add('siph', '관해파리 사슬', D > 500 && D < 3200, '', () => { const S2 = this.deepLife.siphs.find((q) => !q.pos || this.outOfSight(q.pos, P, 8)) || this.deepLife.siphs[0]; S2.pos = null; this.evClose = 12; }, '500–3200 m', () => nearest(this.deepLife.siphs, (x) => x.pos));
-    add('angler', '아귀 근접', D > 1100, '', () => { this.evClose = 24; this.anglerPassT = 0; }, '1100 m – 바닥', () => nearest(this.anglers, (x) => x.pos));
-    add('floor', '민태 통과 (바닥)', D > FD - 120, '', () => { this.evClose = 18; if (this.grenadiers?.[0]) this.grenadiers[0].passT = 0; }, '바닥 120 m 위부터', () => nearest(this.grenadiers, (x) => x.sw?.pos || x.pos));
+    const RUN = tr('진행 중', 'running');
+    add('bait', tr('정어리 군무 (bait ball)', 'Sardine bait ball'), D > 12 && D < 70, sw.active ? RUN : this.events.bait ? this.baitT : tr('20 m 도달 시', 'at 20 m'), () => { this.startSwarm(P, t); const r = Math.random(); sw.hunter = r < 0.45 ? 'tuna' : r < 0.85 ? 'dolphin' : null; this.baitT = 90 + Math.random() * 90; }, '12–70 m', () => sw.active && sw.center);
+    add('whalePass', tr('혹등고래 근접 통과', 'Humpback close pass'), D > 8 && D < 200, w.sw?.pos ? RUN : w.wait, () => { w.closeNext = true; w.wait = 0; if (w.sw) w.sw.pos = null; }, '8–200 m', () => w.sw?.pos);
+    add('whaleShow', tr('혹등고래 숨쉬기 + 꼬리치기', 'Humpback breathing + lobtail'), D < 25, w.ev ? RUN + ': ' + w.ev.st : this.showT ?? 50, () => { this.whaleShowCue = true; w.wait = 0; if (w.sw) w.sw.pos = null; w.ev = null; }, '0–25 m', () => w.sw?.pos);
+    add('manta', tr('만타 편대', 'Manta squadron'), D > 10 && D < 150, this.squad.active ? RUN : this.events.manta ? tr('1회 완료', 'done once') : tr('46 m 도달 시', 'at 46 m'), () => this.startSquadron(P), '10–150 m', () => this.squad.active && this.squad.lead?.pos);
+    add('dolphinPlay', tr('돌고래 장난 (시야 앞)', 'Dolphins playing (in view)'), D < 45, this.pod.playing > 0 ? RUN : this.pod.playT ?? 20, () => { this.pod.playT = 0; }, '0–45 m', () => this.pod.pos);
+    add('dolphinJump', tr('돌고래 점프', 'Dolphin leaps'), D < 45, this.pod.playing > 0 ? RUN : '', () => { this.pod.playing = 18; this.dolphins.forEach((d) => { d.breathT = 0.1 + Math.random(); d.surf = 0; d.jumped = false; }); }, '0–45 m', () => this.pod.pos);
+    add('shark', tr('상어 근접 통과', 'Shark close pass'), D > 45 && D < 340, Math.min(...this.sharks.map((s) => s.timer)), () => { this.evClose = 25; this.sharks.forEach((s, i) => { s.timer = 0.5 + i * 6; }); }, '45–340 m', () => nearest(this.sharks, (x) => x.spawned && x.pos));
+    add('turtle', tr('거대 거북이', 'Giant turtle'), D > 180 && D < 420, tu.active ? RUN : tu.wait, () => { tu.active = false; tu.wait = 0; }, '180–420 m', () => tu.active && [tu.c.world[12], tu.c.world[13], tu.c.world[14]]);
+    add('mega', tr('메갈로돈', 'Megalodon'), D > 250 && D < 1000, mg.active ? RUN : mg.wait, () => { this.megaCue = true; }, '250–1000 m', () => mg.active && mg.pos);
+    add('squid', tr('대왕오징어', 'Giant squid'), D > 600 && D < 1300, sq.active ? RUN : sq.wait, () => { this.squidCue = true; }, '600–1300 m', () => sq.active && sq.pos);
+    add('oar', tr('산갈치', 'Oarfish'), D > 150 && D < 1000, oar?.pos ? RUN : oar?.wait ?? 20, () => { if (oar) { oar.pos = null; oar.wait = 0; } this.evClose = 30; }, '150–1000 m', () => oar?.pos);
+    add('jelly', tr('해파리 근접', 'Jellyfish close'), D > 420 && D < 1800, '', () => { this.evClose = 22; this.jellyPassT = 0; }, '420–1800 m', null);
+    add('chicken', tr('머리 없는 닭 괴물', 'Headless chicken monster'), D > 450 && D < 2600, '', () => { const c = this.deepLife.chickens.find((q) => !q.p || this.outOfSight(q.p, P, 1)) || this.deepLife.chickens[0]; c.p = null; this.evClose = 15; }, '450–2600 m', () => nearest(this.deepLife.chickens, (x) => x.p));
+    add('siph', tr('관해파리 사슬', 'Siphonophore chain'), D > 500 && D < 3200, '', () => { const S2 = this.deepLife.siphs.find((q) => !q.pos || this.outOfSight(q.pos, P, 8)) || this.deepLife.siphs[0]; S2.pos = null; this.evClose = 12; }, '500–3200 m', () => nearest(this.deepLife.siphs, (x) => x.pos));
+    add('angler', tr('아귀 근접', 'Anglerfish close'), D > 1100, '', () => { this.evClose = 24; this.anglerPassT = 0; }, tr('1100 m – 바닥', '1100 m – floor'), () => nearest(this.anglers, (x) => x.pos));
+    add('floor', tr('민태 통과 (바닥)', 'Grenadiers passing (floor)'), D > FD - 120, '', () => { this.evClose = 18; if (this.grenadiers?.[0]) this.grenadiers[0].passT = 0; }, tr('바닥 120 m 위부터', 'from 120 m above floor'), () => nearest(this.grenadiers, (x) => x.sw?.pos || x.pos));
     return L;
   }
   // one big encounter at a time: is another big animal event already on stage?

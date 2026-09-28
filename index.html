@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>DEEPSEA — Abyssal Descent</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Noto+Sans+KR:wght@300;500&display=swap" rel="stylesheet">
@@ -57,7 +57,7 @@
 <div id="hud">
   <div class="zone" id="zone"><b></b><span></span></div>
   <div class="tip" id="tip"></div>
-  <div class="entry-hint" id="entryHint">SPACE 를 눌러 바다로 뛰어들기</div>
+  <div class="entry-hint" id="entryHint" data-t="SPACE 를 눌러 바다로 뛰어들기|Press SPACE to dive in"></div>
   <div class="corner" id="perf"></div>
   <div class="corner" id="keys"></div>
   <div class="corner" id="look"></div>
@@ -66,10 +66,10 @@
 </div>
 <div id="start">
   <h1>DEEPSEA</h1>
-  <p>심해 4,000 m 하강</p>
+  <p data-t="심해 4,000 m 하강|Descend 4,000 m into the deep"></p>
   <div class="go wait" id="go">LOADING…</div>
-  <div class="go2 wait" id="goFloor">바닥에서 시작 · 4,000 m</div>
-  <small>헤드폰 권장 · 마우스로 시점 · 클릭하면 시작</small>
+  <div class="go2 wait" id="goFloor" data-t="바닥에서 시작 · 4,000 m|Start on the floor · 4,000 m"></div>
+  <small id="startNote" data-t="헤드폰 권장 · 마우스로 시점 · 클릭하면 시작 · L 한국어/English|Headphones recommended · mouse to look · click to start · L English/한국어"></small>
 </div>
 <div id="err"></div>
 <script type="module" src="js/main.js"></script>
