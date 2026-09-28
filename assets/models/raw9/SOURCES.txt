@@ -1,0 +1,117 @@
+raw9 model sources: deep-sea species variety set (compiled 2026-09-28). glTF 2.0 GLB with embedded PNG textures (base colour, normal
+and ORM, all 1024 px). Metallic-roughness PBR, no Draco/KTX2, no extensions. Units: metres. Up: +Y. Head: +Z. Centred at the origin
+(bbox centre). Left side of the animal = +X. One mesh / one material each, <= 25k triangles, double-sided.
+Downloaded from the Objaverse mirror of Sketchfab CC-licensed models (https://huggingface.co/datasets/allenai/objaverse).
+The licence was checked twice: the Objaverse annotation "license" field (= "by") and the file's own glTF asset.extras.license
+("CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)").
+CC-BY 4.0 requires attribution in the game credits plus a note that the file was modified.
+None of the models is rigged or animated. The game swims static meshes procedurally along +Z.
+
+Processing (all six): blender/deepspecies.py
+  blender --background --factory-startup --python blender/deepspecies.py -- <key>_src.glb <key>.glb <length_m> [flags] [--preview=<png>]
+  (Blender 5.2, absolute output paths; bakes and previews with Cycles on the CPU only)
+  Common modifications:
+    - removed the colour-checker cube (non-dominant material) or the 12-triangle helper cubes; joined the scan chunks, welded seams,
+      removed floating scan fragments;
+    - baked all transforms; scaled to the real species length; head -> +Z, dorsal -> +Y; centred at the origin;
+    - decimated to <= 25k triangles; new UV layout (smart UV project); smooth normals;
+    - scan texture re-baked onto the new UVs (1024 px, the source textures are 1024 px); tangent-space normal map (1024 px) baked from the
+      full-resolution source (normals on thin fins / legs clamped to <= 70 deg against back-face bake errors); ambient occlusion baked into ORM.R;
+    - unlit / plain scan material -> metallic-roughness: metallic 0, roughness 0.5-0.75 from texture luminance (gulper eel: flat colour,
+      roughness 0.5-0.7), double-sided.
+
+neoscopelid.glb - Shortfin neoscopelid (Neoscopelus microchir, Neoscopelidae, order Myctophiformes = lanternfish order),
+  photogrammetry scan of a real specimen. Lanternfish stand-in; Neoscopelus carries photophores (ventral rows and the tongue).
+  Lives ~200-1,000 m, benthopelagic over continental slopes. 0.20 m total length, 24,624 tris.
+  Title:   サンゴイワシ Shortfin Neoscopelid, N. microchir
+  Author:  ffish.asia / floraZia.com (https://sketchfab.com/ffishAsia-and-floraZia)
+  Source:  https://sketchfab.com/3d-models/shortfin-neoscopelid-n-microchir-3060eb2ab3724241aa0974c4f0860f2a
+           (Objaverse uid 3060eb2ab3724241aa0974c4f0860f2a, glbs/000-038)
+  Licence: CC-BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Credit line: "Shortfin Neoscopelid, N. microchir" by ffish.asia / floraZia.com, CC-BY 4.0, modified.
+  Build: deepspecies.py neoscopelid_src.glb neoscopelid.glb 0.20 --fwd=-x --up=+z --straighten  (418k -> 24.6k tris; bend 2.5 mm removed)
+
+sea_toad.glb - Sea toad (Chaunax abei, Chaunacidae, anglerfish order Lophiiformes), photogrammetry scan of a real specimen.
+  Benthic, ~100-700 m. 0.25 m total length, 24,624 tris. Small non-luminous lure (illicium/esca) on the snout.
+  Title:   ミドリフサアンコウ Anglerfish, Chaunax abei
+  Author:  ffish.asia / floraZia.com (https://sketchfab.com/ffishAsia-and-floraZia)
+  Source:  https://sketchfab.com/3d-models/anglerfish-chaunax-abei-e9594462c7944bc9b205d6e36653c744
+           (Objaverse uid e9594462c7944bc9b205d6e36653c744, glbs/000-138)
+  Licence: CC-BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Credit line: "Anglerfish, Chaunax abei" by ffish.asia / floraZia.com, CC-BY 4.0, modified.
+  Build: deepspecies.py sea_toad_src.glb sea_toad.glb 0.25 --fwd=-x --up=+z --straighten  (424k -> 24.6k tris)
+  Note: the specimen rests on its belly, so the body is somewhat flattened (0.108 m wide x 0.060 m high).
+
+greeneye.glb - Greeneye (Chlorophthalmus albatrossis, Chlorophthalmidae), photogrammetry scan of a real specimen.
+  Benthic, ~150-700 m. 0.18 m total length, 24,624 tris. Large green-reflecting eyes; the genus has a small perianal light organ.
+  Title:   アオメエソ メヒカリ Greeneye, C. albatrossis
+  Author:  ffish.asia / floraZia.com (https://sketchfab.com/ffishAsia-and-floraZia)
+  Source:  https://sketchfab.com/3d-models/greeneye-c-albatrossis-4be52fbdca4f406d89752ca569e452ef
+           (Objaverse uid 4be52fbdca4f406d89752ca569e452ef, glbs/000-052)
+  Licence: CC-BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Credit line: "Greeneye, C. albatrossis" by ffish.asia / floraZia.com, CC-BY 4.0, modified.
+  Build: deepspecies.py greeneye_src.glb greeneye.glb 0.18 --fwd=-x --up=+z --straighten  (358k -> 24.6k tris)
+
+armored_searobin.glb - Armoured searobin (Peristedion orientale, Peristediidae), photogrammetry scan of a real specimen.
+  Benthic, ~100-600 m. 0.22 m total length (incl. the forked rostrum), 24,624 tris. Bony armour plates, chin barbels.
+  Title:   キホウボウ Oriental Searobin, Peristedion orientale
+  Author:  ffish.asia / floraZia.com (https://sketchfab.com/ffishAsia-and-floraZia)
+  Source:  https://sketchfab.com/3d-models/oriental-searobin-peristedion-orientale-589d319f2b6d45a39922a31a9b45d1d0
+           (Objaverse uid 589d319f2b6d45a39922a31a9b45d1d0, glbs/000-150)
+  Licence: CC-BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Credit line: "Oriental Searobin, Peristedion orientale" by ffish.asia / floraZia.com, CC-BY 4.0, modified.
+  Build: deepspecies.py armored_searobin_src.glb armored_searobin.glb 0.22 --fwd=-x --up=+z --straighten  (315k -> 24.6k tris; bend 6 mm removed)
+
+giant_isopod.glb - Giant isopod (Bathynomus giganteus per the source description), 3D scan of a real specimen.
+  Benthic scavenger, ~170-2,140 m. 0.30 m long, 0.25 m wide (legs spread), 24,625 tris. Crawls; no swim deformation.
+  Title:   Giant Isopod
+  Author:  RISD Nature Lab (https://sketchfab.com/RISDNaturelab)
+  Source:  https://sketchfab.com/3d-models/giant-isopod-46469c568b3743ec8fb4bb711949d49a
+           (Objaverse uid 46469c568b3743ec8fb4bb711949d49a, glbs/000-006)
+  Licence: CC-BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Credit line: "Giant Isopod" by RISD Nature Lab, CC-BY 4.0, modified.
+  Build: deepspecies.py giant_isopod_src.glb giant_isopod.glb 0.30 --fwd=+x --up=+z  (500k -> 24.6k tris; two helper cubes removed)
+  Note: the scan texture has a few pale specular patches on the back plates.
+
+gulper_eel.glb - Gulper / pelican eel (Eurypharynx pelecanoides, Eurypharyngidae), digital sculpt of the real anatomy (not a scan),
+  jaws open with the pouch-like lower jaw spread. ~500-3,000 m. 0.75 m total length, 24,624 tris.
+  Luminous organ at the tip of the whip-like tail.
+  Title:   Gulper Eel (Eurypharynx pelecanoides)
+  Author:  SpaceGolby (https://sketchfab.com/SpaceGolby)
+  Source:  https://sketchfab.com/3d-models/gulper-eel-eurypharynx-pelecanoides-fbae0106acab48f4869141df9d8c37da
+           (Objaverse uid fbae0106acab48f4869141df9d8c37da, glbs/000-086)
+  Licence: CC-BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Credit line: "Gulper Eel (Eurypharynx pelecanoides)" by SpaceGolby, CC-BY 4.0, modified.
+  Build: deepspecies.py gulper_eel_src.glb gulper_eel.glb 0.75 --fwd=-y --up=+z --color=0.035,0.027,0.028 --rough=0.5,0.7
+         (284k -> 24.6k tris). The source has no texture (one flat brown material). Replaced with a flat near-black base colour
+         (linear 0.035, 0.027, 0.028, like the live animal), baked sculpt normal map + AO, roughness 0.5-0.7 (higher in crevices).
+
+<key>_src.glb     - unmodified source downloads (for re-running blender/deepspecies.py).
+<key>_preview.png - Blender Cycles (CPU) renders of <key>.glb made for this project: side (left flank), 3/4 front (top row),
+                    top, untextured clay side showing the baked normal-map detail (bottom row).
+
+Candidates evaluated and rejected (Workbench previews rendered in Blender):
+  Viperfish (I.B.Gallas, d70bd0fd...) - CC-BY, 2.6k-tri untextured low-poly model.
+  Dragonfish [metallic version] (chui, 1dd07e4b...) and Dragon Fish 3D Model (pattap, f485eb03...) - CC-BY, but an Asian
+    arowana ("dragon fish") / segmented toy, not a Stomiidae dragonfish.
+  Flapjack Dumbo Octopus Adorabilis (Borderandry, 977d38f8...) - CC-BY, 4.5k tris, cute stylised sculpt, glossy black.
+  Vampire Squid (starryeyedwisdom, 4a19c53d...), Hatchet Fish (57bd8d53...), Cusk Eel, Gigantura Chuni - 450-700-tri school models.
+  Blobfish (ogelspider, ba3347a6...) - CC-BY, 197k-tri untextured SculptGL blob with a human-like face; not clearly better than the
+    existing assets/models/raw/blobfish.glb, so the old one was NOT replaced. Other blobfish entries are memes/ships/characters.
+  Bigfin Squid (andreasable, 47de872f...) - CC-BY, stylised model inside a water-volume box, thread-like arms.
+  Marrus/Deep-Sea Jellyfish (Siphonophora) (n-, 4a9d9b85...) - CC-BY, rigged, but a simplified stylised colony.
+  Daiougusokumushi Bathynomus giganteus (seirogan, 69268685...) - CC-BY, 353k-tri sculpt with a clearcoat lilac material; the RISD
+    scan above is more realistic.
+  Chambered Nautilus (RISD Nature Lab, ad379c7c...) - CC-BY scan, but only the cut-open shell (no animal).
+  Coelacanth (fish) (voxels) (edemaistre) - voxel art; COELACANTH (conqueror78) - a stone slab; Animated Latimeria - cut-away model.
+  Deep-sea fish, Unidentified yet x4 (ffishAsia-and-floraZia, 06da67e2 / 24564d75 / 7fcce003 / 43ccc02c) - realistic scans but
+    unidentified species (boarfish-like / morid cod-like).
+  West Pacific Luminous Roughy (ffishAsia-and-floraZia, 8c6ea621...) - CC-BY, realistic scan with a ventral light organ; runner-up,
+    not processed (only ~0.12 m, similar body plan to the chosen fish).
+  Deep-sea Conger Eel, Congriscus megastomus (70ff8dd3...) and Roudi Escolar (be7eecaa...) (ffishAsia-and-floraZia) - CC-BY, realistic
+    scans; runners-up, not processed (plain eel / snake-mackerel shapes).
+  Oriental Searobin (ffishAsia-and-floraZia, 8241681d...) - second scan of the chosen species; 589d319f has the better texture.
+  Gulper-type anglerfish / "Deep Sea Fish" / "Deepsea Horror" sculpts (carlo-bergonzini, Ida..Faber, iggy-design, arun1232, etc.) - fantasy.
+  Not present as a CC-BY / CC0 realistic model in Objaverse 1.0: Chauliodus / Stomiidae dragonfish, Grimpoteuthis, Vampyroteuthis,
+    frilled shark, bluntnose sixgill, barreleye (Macropinna), oarfish, deep-sea hatchetfish, true myctophid lanternfish,
+    sea pig (Scotoplanes), tripod fish (Bathypterois).

@@ -1,0 +1,33 @@
+raw6 model sources (compiled 2026-09-26). glTF 2.0 GLB, embedded 1024 px PNG textures, metallic-roughness PBR,
+no Draco/KTX2, no extensions. Units: metres. Up: +Y. Head: +Z. Centred at the origin (rest-pose bbox centre). Left side of the animal = +X.
+Downloaded from the Objaverse mirror of Sketchfab CC-licensed models (https://huggingface.co/datasets/allenai/objaverse).
+The licence was checked twice: the Objaverse annotation "license" field (= "by") and the file's own glTF asset.extras.license
+("CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)").
+CC-BY 4.0 requires attribution in the game credits plus a note that the file was modified.
+
+shark.glb - Great white shark (Carcharodon carcharias), realistic sculpt with painted PBR textures, artist rig + animations
+  Title:   Animated Swimming Great White Shark Loop
+  Author:  LasquetiSpice (https://sketchfab.com/LasquetiSpice)
+  Source:  https://sketchfab.com/3d-models/animated-swimming-great-white-shark-loop-297ed35c6a5f43749b0ae189d991a3f1
+           (Objaverse uid 297ed35c6a5f43749b0ae189d991a3f1, glbs/000-117)
+  Licence: CC-BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Credit line: "Animated Swimming Great White Shark Loop" by LasquetiSpice, CC-BY 4.0, modified.
+  Modifications (blender/shark.py):
+    - removed a stray helper mesh (42-vertex icosphere), Sketchfab root empties and the 32 s root-motion "Circling" clip;
+    - baked all node transforms into the armature and mesh; scaled from 16.9 units to 4.5 m long; centred at the origin;
+    - welded duplicate vertices; mouth-interior (palate/throat) geometry decimated to 30 %, body kept at full resolution
+      (51.2k -> 32.0k triangles); unused extra UV sets removed; smooth normals;
+    - KHR_materials_pbrSpecularGlossiness material converted to metallic-roughness: metallic 0, roughness 0.5-0.8
+      (mean 0.56) derived from the gloss map, ambient occlusion packed into the ORM texture (R), base colour and normal map unchanged;
+    - "Swimming" clip renamed "Swim", retimed from 1.97 s to 1.583 s (38 frames at 24 fps) with an exact loop;
+      "Biting" clip renamed "Bite" (1.0 s, includes a short forward lunge of the root bone).
+
+shark_src.glb     - unmodified source download (for re-running blender/shark.py).
+shark_preview.png - Blender EEVEE renders of shark.glb made for this project (side, 3/4, front, top-view Swim cycle, Bite, head close-up).
+
+Candidates evaluated and rejected (previews rendered in Blender):
+  Model 62A - Shortfin Mako (DigitalLife3D, d5727703...) - file metadata says CC-BY-NC 4.0 (Objaverse annotation says "by"): NOT usable.
+  White Pointer (artStevenz/3dCoast, 8e429052...) - CC-BY, but black toon outlines baked into the texture (cartoon look).
+  Great White Shark (zak/kitchz, 2364bdca...) - CC-BY, realistic but unrigged and less detailed than the chosen model.
+  Tiger Shark (intervirtual), Great White (pibraclab, canyutsai1, velsakthi562, DNC44), Shark (Akusuma) - stylised, glossy or untextured.
+  White Shark, Pamet Harbor (wethabitat) and Mako (coffinbayscuba) - photogrammetry of dead sharks on a beach/in the field, with ground; unusable.

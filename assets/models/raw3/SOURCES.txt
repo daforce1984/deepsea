@@ -1,0 +1,23 @@
+raw3 model sources (compiled 2026-09-26).
+Downloaded from the Objaverse mirror of Sketchfab CC-licensed models (https://huggingface.co/datasets/allenai/objaverse).
+The licence was checked twice: the Objaverse annotation "license" field (= "by") and the file's own glTF asset.extras.license.
+CC-BY 4.0 requires attribution in the game credits plus a note that the files were modified.
+
+grand_banks_2002_src.glb  ->  ../game/diveboat_hd.glb
+  Title:   2002 Grand Banks
+  Author:  BoatUS Foundation (https://sketchfab.com/boatusfoundation)
+  Source:  https://sketchfab.com/3d-models/2002-grand-banks-14564c5ec6ee4f11a3ea8e213b981cb1
+           (Objaverse uid 14564c5ec6ee4f11a3ea8e213b981cb1, glbs/000-137)
+  Licence: CC-BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Credit line: "2002 Grand Banks" by BoatUS Foundation, CC-BY 4.0, modified.
+  Modifications (blender/diveboat_hd.py): removed an invisible sub-millimetre hardware mesh (84.5k tris);
+    merged duplicate vertices and removed degenerate faces; decimated from 556k to 190k triangles; recomputed
+    smooth/sharp normals; fire-extinguisher material set to opaque; textures re-encoded as JPEG (sizes unchanged, <= 1024 px);
+    baked the source node transforms (real size kept, 14.9 m LOA), recentred (bow +Z, design waterline at y = 0); added empty nodes spawn_diver and entry_point.
+
+candidate_*.png - Blender EEVEE previews of the shortlisted candidates (all CC-BY 4.0 on Sketchfab/Objaverse):
+  towboatus_tow_boat      - "Tow Boat", BoatUS Foundation, uid 86939cf48b914951aa3c6ed2bc8bb446 (11 m aluminium tow/work boat)
+  grady_white_freedom325  - "Freedom 325 Grady White", BoatUS Foundation, uid 71ca8a73f97d44a98f92dd785e151b93 (10 m dual console)
+  glacier_bay_catamaran   - "Glacier Bay", BoatUS Foundation, uid 6c4e6c341c09466fa6d6aafb8d7312b0 (power catamaran)
+  rastar3200_tugboat      - "Rastar 3200 tugboat", Brout, uid 1bbadbe4ab0a4b2599cd3f450942e6fe
+  lobster35               - "Lobster 35", angelo raffaele catalano, uid 0bdd7a0de7254426890bb5745bb7da6d (untextured, spec-gloss, 1.5M tris)

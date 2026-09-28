@@ -1,0 +1,44 @@
+raw4 model sources (compiled 2026-09-26). All files: glTF 2.0 GLB, embedded 1024 px PNG/JPEG textures, metallic-roughness PBR,
+no Draco/KTX2/extensions. Units: metres. Up: +Y. Head: +Z. Centred at the origin (bbox centre). Left side of the animal = +X.
+Downloaded from the Objaverse mirror of Sketchfab CC-licensed models (https://huggingface.co/datasets/allenai/objaverse).
+Licence checked in both the Objaverse annotation and the file's embedded Sketchfab metadata (asset.extras.license).
+CC-BY 4.0 requires attribution in the credits and a note that the files were modified.
+
+sunfish.glb - Ocean sunfish (Mola mola), hand-modelled and textured, rigged for this project
+  Title: "Sunfish / Poisson Lune"   Author: Batton (https://sketchfab.com/batton)
+  Source: https://sketchfab.com/3d-models/sunfish-poisson-lune-73fa95c5743845e58a2686da7a1f247e
+  Licence: CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+  Changes: embedded lamp/camera removed; rotated to face +Z; scaled to 2.0 m long (2.6 m fin-to-fin); brownish-black
+  streaks on the anal fin recoloured grey in the base-colour texture; 6-bone armature added (body, dorsal0/1, anal0/1,
+  clavus) with procedural weights and a 2.0 s "Swim" loop (dorsal and anal fins sculling side to side, clavus rudder).
+
+tuna.glb - Pacific bluefin tuna (Thunnus orientalis), photogrammetry scan, rigged for this project
+  Title: "クロマグロ Pacific Bluefin Tuna, Thunnus orientalis"
+  Author: ffish.asia / floraZia.com (https://sketchfab.com/ffishAsia-and-floraZia)
+  Source: https://sketchfab.com/3d-models/pacific-bluefin-tuna-thunnus-orientalis-88d6e843abfb44d086341323e99b83ac
+  Licence: CC-BY 4.0
+  Changes: colour-checker cube and 157 small loose fragments removed; scan chunks welded and decimated from 1.17M to 28.4k
+  triangles; unlit material (KHR_materials_unlit) changed to lit PBR (roughness 0.4, metallic 0); rotated to face +Z;
+  scaled to 2.0 m; 5-bone spine chain added with procedural weights and a 1.0 s thunniform "Swim" loop.
+
+dolphin.glb - Common bottlenose dolphin (Tursiops truncatus), game mesh with the artist's rig and swim animation
+  Title: "Bottlenose Dolphin"   Author: popcornbag (https://sketchfab.com/popcornbag)
+  Source: https://sketchfab.com/3d-models/bottlenose-dolphin-4bb04fa58d6846938e07bb38507e3f3a
+  Licence: CC-BY 4.0
+  Changes: scaled from centimetres to 2.6 m; object transforms applied into the armature and mesh; the FBX-style vertical
+  bind pose rebaked so the rest pose equals the first swim frame (horizontal); animation re-keyed against the new rest
+  pose (motion unchanged); action kept as "Swim". The original morph-target weight channels were kept.
+
+tuna_b.glb (optional alternate) - Yellowfin tuna, hand-painted game model with the artist's rig and animation
+  Title: "Tuna Fish"   Author: GoldenZtuff (https://sketchfab.com/dhjwdwd)
+  Source: https://sketchfab.com/3d-models/tuna-fish-c5fad940863f47f784d792ca95e16b42
+  Licence: CC-BY 4.0
+  Changes: scaled to 2.0 m and rotated to face +Z; bind pose rebaked from animation frame 9 (straightest pose); the
+  "Armature|Action" clip was renamed to "Swim" and the second clip ("Armature|ArmatureAction") was removed.
+
+*_preview.png - Blender EEVEE renders of the final files above (made for this project).
+
+Rejected: DigitalLife3D "Model 61A - Bottlenose Dolphin" and "Model 75A - Harbor Porpoise". The Objaverse annotation
+says "by", but the file's embedded licence is CC-BY-NC-4.0. Also rejected: NHMWien sunfish scans (CC-BY-NC); the Naturalis
+"MOLA" (CC-BY, not in Objaverse, and Sketchfab needs a login to download); several cartoon or low-poly sunfish, tuna and
+dolphin models.

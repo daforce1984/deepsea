@@ -1,0 +1,20 @@
+[
+ {"name":"amb_shallow","query":"underwater ambience","match":"^Underwater Ambience\\.wav$"},
+ {"name":"amb_deep","query":"underwater ambience","match":"^Deep Underwater Ambience Tonal Dark$"},
+ {"name":"amb_abyss","query":"underwater ambience","match":"^Abyss Ambience$"},
+ {"name":"breath_scuba","query":"scuba breathing","match":"^To breathe with a scuba gear$"},
+ {"name":"breath_mask","query":"scuba breathing","match":"^Full face mask diving$"},
+ {"name":"surface_waves","query":"ocean waves boat","match":"^Boat_waves$"},
+ {"name":"splash_dive","query":"splash dive water","match":"^Cinematic Dive Underwater$"},
+ {"name":"torch_click","query":"flashlight click","match":"^Flashlight Switch$"},
+ {"name":"whoosh_deep","query":"whoosh underwater","match":"^Underwater whoosh \\(Deep\\)$"},
+ {"name":"whoosh_move","query":"whoosh underwater","match":"^Underwater Movement Whoosh 3$"},
+ {"name":"sonar","query":"sonar beep","match":"^Deepsea Sonar$"},
+ {"name":"whale_low","query":"whale song","match":"^LowWhalesong$"},
+ {"name":"whale_creepy","query":"whale song","match":"^Creepy Whale Song$"},
+ {"name":"bubbles_loop","query":"bubbles underwater","match":"^loop air bubbles$"},
+ {"name":"hud_beep","query":"digital beep hud","match":"^UI Futuristic HUD Beep$"},
+ {"name":"hud_scan","query":"digital beep hud","match":"^UI Tactical Scan Beep$"},
+ {"name":"rumble","query":"underwater ambience","match":"^Underwater rumble sound effect$"},
+ {"name":"creature_move","query":"underwater ambience","match":"^Underwater Creature Movement \\(2\\)$"}
+]

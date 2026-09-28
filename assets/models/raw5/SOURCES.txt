@@ -1,0 +1,31 @@
+raw5 model sources (compiled 2026-09-26). glTF 2.0 GLB, embedded 1024 px PNG textures, metallic-roughness PBR,
+no Draco/KTX2/extensions. Units: metres. Up: +Y. Head: +Z. Centred at the origin (bbox centre). Left side of the animal = +X.
+Downloaded from the Objaverse mirror of Sketchfab CC-licensed models (https://huggingface.co/datasets/allenai/objaverse).
+The licence was checked in the Objaverse annotation (license "by"), in the file's embedded Sketchfab metadata
+(asset.extras.license = CC-BY-4.0), and on the live Sketchfab API (2026-09-26: "CC Attribution").
+CC-BY 4.0 requires attribution in the credits and a note that the file was modified.
+
+humpback.glb - Humpback whale (Megaptera novaeangliae), sculpted and retopologised, rigged and animated for this project
+  Title: "Game-ready Humpback Whale"   Author: Allie2k (https://sketchfab.com/Allie2k)
+  Source: https://sketchfab.com/3d-models/game-ready-humpback-whale-da07e3ff73914ff28d2b8cf9da794036
+          (Objaverse uid da07e3ff73914ff28d2b8cf9da794036)
+  Licence: CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+  Changes: loose mesh pieces welded (UV seams kept); one Catmull-Clark subdivision level (4,968 -> 29,808 tris);
+  scaled to 14.0 m long; pectoral fins lengthened along their axis from 3.7 m to 4.5 m (about 1/3 of body length);
+  centred; material set to metallic 0 / roughness 0.55 (original base colour and normal maps kept unchanged);
+  12-bone armature added (Root, Chest, Head, Spine1-3, Tail, Flukes, Fin1/Fin2 .L/.R) with procedural smooth
+  weights, and a 7.0 s looping "Swim" clip (dorso-ventral travelling wave with fluke up/down stroke,
+  gentle pectoral flap and twist). Build script: blender/humpback.py.
+
+humpback_preview.png - Blender EEVEE renders of the final file (side, 3/4, underside, mid-stroke frame), made for this project.
+
+Rejected:
+- "Humpback Whale" 5ea6c62f13674df394bd9ff28b502ca5 (uploader Yapoco / alfredonicolasalarcon): the most detailed
+  texture, marked CC-BY, but the uploader's account consists largely of re-uploaded third-party/franchise content
+  (Mario, SpongeBob, Pingu, etc.), the mesh is named "humpback_whale_LOD2" (looks like a game-asset extraction), and the model
+  has been removed from Sketchfab (API: Not found). The CC-BY claim is not trustworthy.
+- "Humpback whale - animation test" (LottaAndriesse, CC-BY-NC) and "Humpback whale" (CARIMAM, CC-BY-NC-SA): NC licences.
+- "Humpback Whale (Swimming)/(Idle)" (Connlan_Immure, CC-BY, rigged): pale, flat texture and a weaker sculpt.
+- "High-Poly Humbpack Whale" (K9239, CC-BY): bent pose, barnacle geometry with yellow dots, 25 objects.
+- "Sculpted Whale" (Allie2k): the 130k-tri sculpt of the same whale, with no normal map. The retopologised game-ready version was used.
+- Low-poly/animated game whales (nolanfa, ferofluid, arko97x), voxel and scene models: cartoonish or too low-poly.

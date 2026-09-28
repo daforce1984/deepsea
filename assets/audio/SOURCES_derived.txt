@@ -1,0 +1,5 @@
+dolphin_out_1..3 / dolphin_in_1..3 (assets/audio/game): cut from surface_waves (Pixabay) — wave-crash onsets, high-passed / pitched
+  (out: bright quick wash; in: plunge + synthetic low 'plop' + muffled tail). Built 2026-09-28 by an inline numpy script.
+slap_big / slap_rock: Pixabay 'Big waterspalsh' (Soumages), 'Big Rock Splash 5' (DRAGON-STUDIO), trimmed + normalised.
+drop_grains.ogg/.json: 37 single drops cut (onset detection) from Pixabay 'Water drops falling in water' (Creativenabeel02),
+  'Water Drops Falling' (Homemade_SFX), 'a drops of water' (Youssefmizani); sorted bright->deep; played as grains by the drops AudioWorklet.

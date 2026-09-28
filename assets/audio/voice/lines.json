@@ -1,0 +1,86 @@
+[
+ [
+  10,
+  "v010",
+  "Depth, ten meters.",
+  "DEPTH 10 m"
+ ],
+ [
+  30,
+  "v030",
+  "Depth, thirty meters.",
+  "DEPTH 30 m"
+ ],
+ [
+  60,
+  "v060",
+  "Depth, sixty meters.",
+  "DEPTH 60 m"
+ ],
+ [
+  100,
+  "v100",
+  "Depth, one hundred meters.",
+  "DEPTH 100 m"
+ ],
+ [
+  200,
+  "v200",
+  "Depth, two hundred meters.",
+  "DEPTH 200 m"
+ ],
+ [
+  300,
+  "v300",
+  "Depth, three hundred meters.",
+  "DEPTH 300 m"
+ ],
+ [
+  500,
+  "v500",
+  "Depth, five hundred meters.",
+  "DEPTH 500 m"
+ ],
+ [
+  700,
+  "v700",
+  "Depth, seven hundred meters.",
+  "DEPTH 700 m"
+ ],
+ [
+  1000,
+  "v1000",
+  "Depth, one thousand meters.",
+  "DEPTH 1,000 m"
+ ],
+ [
+  1500,
+  "v1500",
+  "Depth, fifteen hundred meters.",
+  "DEPTH 1,500 m"
+ ],
+ [
+  2000,
+  "v2000",
+  "Depth, two thousand meters.",
+  "DEPTH 2,000 m"
+ ],
+ [
+  3000,
+  "v3000",
+  "Depth, three thousand meters.",
+  "DEPTH 3,000 m"
+ ],
+ [
+  3800,
+  "v3800",
+  "Depth, three thousand eight hundred meters.",
+  "DEPTH 3,800 m"
+ ],
+ [
+  3990,
+  "v4000",
+  "Depth, four thousand meters.",
+  "DEPTH 4,000 m"
+ ]
+]

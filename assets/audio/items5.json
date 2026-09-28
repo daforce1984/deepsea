@@ -1,0 +1,6 @@
+[
+ {"name":"jump_splash","query":"jump into water","match":"^jump into water splash sound$"},
+ {"name":"pool_jump","query":"jump into water","match":"^jumping into swimming pool$"},
+ {"name":"splash_real","query":"body splash water","match":"^splash_2$"},
+ {"name":"plunge_bubbles","query":"diving into water underwater","match":"^bubbles$"}
+]

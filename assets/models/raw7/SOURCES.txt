@@ -1,0 +1,46 @@
+raw7 model sources (compiled 2026-09-27). glTF 2.0 GLB, embedded PNG textures (base colour 2048 px, normal + ORM 1024 px),
+metallic-roughness PBR, no Draco/KTX2, no extensions. Units: metres. Up: +Y. Head: +Z. Centred at the origin (bbox centre). Left side of the animal = +X.
+Downloaded from the Objaverse mirror of Sketchfab CC-licensed models (https://huggingface.co/datasets/allenai/objaverse).
+The licence was checked twice: the Objaverse annotation "license" field (= "by") and the file's own glTF asset.extras.license
+("CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)").
+CC-BY 4.0 requires attribution in the game credits plus a note that the file was modified.
+
+deepfish.glb - Grenadier / rattail (Coryphaenoides marginatus, Macrouridae), photogrammetry scan of a real specimen.
+  Stand-in for the abyssal grenadier (Coryphaenoides armatus, same genus, the commonest large fish seen on the
+  abyssal floor, down to ~5000 m, up to ~1 m long); scaled to 1.0 m total length.
+  Title:   ヘリダラ Amami Grenadier, Coryphaenoides marginatus
+  Author:  ffish.asia / floraZia.com (https://sketchfab.com/ffishAsia-and-floraZia)
+  Source:  https://sketchfab.com/3d-models/amami-grenadier-coryphaenoides-marginatus-608ceff39222456fbbcd9f0237e67ac7
+           (Objaverse uid 608ceff39222456fbbcd9f0237e67ac7, glbs/000-081)
+  Licence: CC-BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Credit line: "Amami Grenadier, Coryphaenoides marginatus" by ffish.asia / floraZia.com, CC-BY 4.0, modified.
+  Modifications (blender/deepfish.py):
+    - removed the colour-checker cube; joined the 6 scan chunks, welded their seams, removed 96 floating scan fragments;
+    - baked all transforms; scaled from 19.2 units to 1.0 m long; head -> +Z, dorsal -> +Y; centred at the origin;
+      removed the specimen's slight sideways bend (cubic centre-line fit, max 3.8 cm);
+    - decimated 442.7k -> 35.6k triangles; new UV layout; smooth normals;
+    - unlit scan texture (1024 px) re-baked onto the new UVs at 2048 px; tangent-space normal map (1024 px) baked
+      from the full-resolution scan (normals on the thin fins clamped to <= 70 deg to remove back-face bake errors);
+      ambient occlusion baked into ORM.R;
+    - metallic-roughness material: metallic 0, roughness 0.52-0.72 (mean 0.62) derived from texture luminance,
+      double-sided (fins are single-sheet surfaces). No rig/animation (the game swims static meshes procedurally along +Z).
+
+deepfish_src.glb     - unmodified source download (for re-running blender/deepfish.py:
+                       blender --background --factory-startup --python blender/deepfish.py -- deepfish_src.glb deepfish.glb [length_m]).
+deepfish_preview.png - Blender Cycles (CPU) renders of deepfish.glb made for this project: side, 3/4 front, top, head close-up
+                       (top two rows), and untextured clay renders showing the baked normal-map detail (bottom row).
+
+Candidates evaluated and rejected (previews rendered in Blender, Cycles CPU):
+  Goblin Shark.zip (canyutsai1, 778fd6de...) - CC-BY, 18.8k tris, but a generic cartoonish shark body (not goblin-shark anatomy), glossy.
+  Goblin_Shark (sassimedamine, 94b1136c...) - CC-BY, 2.2M-tri ZBrush sculpt: exaggerated monster/horned stylisation, untextured, 26 loose parts.
+  Shortspine Spurdog, Squalus mitsukurii (ffishAsia-and-floraZia, f33ff2ed...) - CC-BY, excellent realistic shark scan (1.7M tris),
+    runner-up; rejected because it is a ~1 m shelf/slope dogfish (100-950 m) with post-mortem red bruising on the skin.
+  Spiny Dogfish (MTSUichthyology, b64b5c66...) - CC-BY scan, specimen curled into a C shape.
+  Spotted Ratfish (MTSUichthyology, 53a2744b...) - CC-BY scan, crumpled specimen, broken fins.
+  Animated Latimeria (mwintersberger, 165e7f54...) - CC-BY, but a cut-away/anatomical model, spec-gloss, no usable exterior.
+  COELACANTH (conqueror78, d8a88604...) - CC-BY, file actually contains a stone slab, not a fish.
+  Roughsnout grenadier (amyscottmurray, 3f1ea2bb...) - CC-BY, realistic but only 20k tris / low-res texture, thin rat-tail.
+  Sagami Grenadier x2, Japanese Grenadier, unidentified deep-sea fish scans (ffishAsia-and-floraZia) - CC-BY, realistic,
+    but not an abyssal genus (Ventrifossa, Coelorinchus) or unidentified/shallower forms.
+  Deep Sea Fish #3DSM4 (carlo-bergonzini) and other anglerfish models - fantasy/stylised.
+  No CC-BY/CC0 sixgill, sleeper/Greenland, frilled or realistic goblin shark exists in Objaverse 1.0.

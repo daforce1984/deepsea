@@ -1,0 +1,6 @@
+# original downloaded models (the game loads the processed .glb next to them)
+*_src.glb
+*_src.*
+__pycache__/
+*.pyc
+*.log

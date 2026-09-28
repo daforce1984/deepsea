@@ -1,0 +1,170 @@
+raw13 model sources: school / deep-sea fish set + tuna mouth fix (compiled 2026-09-28). glTF 2.0 GLB with embedded PNG textures
+(base colour + normal + ORM; 1024 px for kingfish / anglerfish, 512 px for sardine / cutlassfish / lanternfish / hatchetfish).
+Metallic-roughness PBR, no Draco/KTX2, no extensions. Units: metres. Up: +Y. Head: +Z. Centred at the origin (bbox centre).
+Left side of the animal = +X. One mesh / one material each, double-sided, static (no rig) - except tuna.glb (see below).
+ORM: R = ambient occlusion, G = roughness, B = metallic. Silver fish carry metallic 0.6-0.8 / roughness 0.22-0.3 on the bright,
+unsaturated (silver) texels; dark / coloured texels (backs, yellow fins, eyes) stay dielectric (metallic 0, roughness 0.5-0.75).
+Downloaded from the Objaverse mirror of Sketchfab CC-licensed models (https://huggingface.co/datasets/allenai/objaverse).
+The licence was checked twice: (1) the Objaverse annotation "license" field (= "by" for all) and (2) the file's own glTF
+asset.extras.license ("CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)" for all). Third check (Sketchfab API,
+2026-09-28): the ffish.asia models have since been re-licensed to CC0 on Sketchfab; they are still credited here under the
+CC-BY 4.0 terms they were downloaded under. CC-BY 4.0 requires attribution in the game credits plus a note that the file was modified.
+
+Processing (all six static fish): blender/fishset.py (a copy of blender/deepsharks.py / deepspecies.py, extended with:
+  --jaw=hz,hy,tz,ty,deg  closes an open mouth on the full-resolution source before decimating / baking;
+  --silver=lo,hi,metal,rough  silver scales -> metallic/roughness in the ORM (B channel = metallic);
+  --grade=sat,gain  desaturate / darken a painted base colour; --roll, --drop-mats, --cage/--ray bake distances;
+  two-pass bake with sentinel fill (texels the first ray pass misses are re-baked with a 4x ray, the rest flood-filled),
+  UV island packing, armature poses applied for rigged sources, low-poly bbox re-centred and scaled to the exact length,
+  --probe=<png> Workbench head close-up used to measure the jaw hinge.)
+  blender --background --factory-startup --python blender/fishset.py -- <key>_src.glb <key>.glb <length_m> [flags] [--preview=<png>]
+  (Blender 5.2, Windows paths from WSL via wslpath -w; bakes and previews with Cycles on the CPU only, probes with Workbench)
+  Common modifications: removed the colour-checker cube; joined the scan chunks (all texture atlases), welded seams, removed
+  floating scan fragments; baked all transforms; head -> +Z, dorsal -> +Y; lateral bend removed (--straighten); centred;
+  decimated to the triangle budget; new UV layout (smart UV project + pack); smooth normals; source colour re-baked onto the new
+  UVs; tangent-space normal map baked from the full-resolution source (clamped to <= 70 deg); AO baked into ORM.R; roughness from
+  texture luminance; metallic from the silver mask (silver fish); scaled to the stated length; double-sided.
+  Head direction check: every output was re-imported in Blender and a Workbench close-up of its glTF +Z end rendered from +X
+  (the animal's left flank): the head (eye, snout, mouth) is at +Z in all of them; mouth state checked on the same close-ups.
+
+kingfish.glb - Five-ray yellowtail / Japanese amberjack (Seriola quinqueradiata), photogrammetry scan of a real specimen.
+  Stand-in for the yellowtail amberjack / kingfish (Seriola lalandi, same genus, near-identical silver-olive body with a yellow
+  lateral stripe and yellow fins). 0.85 m total length, 2,462 tris, textures 1024 px. Mouth closed (as scanned; lips just parted).
+  Title:   ブリ Five-ray Yellowtail, Seriola quinqueradiata
+  Author:  ffish.asia / floraZia.com (https://sketchfab.com/ffishAsia-and-floraZia)
+  Source:  https://sketchfab.com/3d-models/five-ray-yellowtail-seriola-quinqueradiata-e27d30bd4d7347238e428a8e36d9fde4
+           (now https://sketchfab.com/3d-models/cc0-five-ray-yellowtail-s-quinqueradiata-e27d30bd4d7347238e428a8e36d9fde4)
+           (Objaverse uid e27d30bd4d7347238e428a8e36d9fde4, glbs/000-107)
+  Licence: CC-BY 4.0 (annotation "by" + asset.extras.license CC-BY-4.0); Sketchfab page now CC0.
+  Credit line: "Five-ray Yellowtail, Seriola quinqueradiata" by ffish.asia / floraZia.com, CC-BY 4.0, modified.
+  Build: fishset.py kingfish_src.glb kingfish.glb 0.85 --fwd=-x --up=+z --keep-mats --straighten --tris=2500
+         --silver=0.45,0.65,0.7,0.28 --cage=0.004 --ray=0.012   (1.17M -> 2,462 tris; bend 4.9 mm removed)
+
+sardine.glb - Japanese pilchard / spotline sardine (Sardinops melanostictus, Clupeidae), photogrammetry scan of a real specimen.
+  Pilchard-type clupeid (same subfamily as Sardina pilchardus). 0.20 m, 392 tris, textures 512 px. Forked tail and closed mouth
+  kept in the silhouette. Mouth closed (as scanned).
+  Title:   マイワシ Spotline Sardine, Sardinops melanostictus
+  Author:  ffish.asia / floraZia.com (https://sketchfab.com/ffishAsia-and-floraZia)
+  Source:  https://sketchfab.com/3d-models/spotline-sardine-sardinops-melanostictus-3ca7caa7f6e14bbb8c5e17381d5d8c39
+           (now https://sketchfab.com/3d-models/cc0-sardine-sardinops-melanostictus-3ca7caa7f6e14bbb8c5e17381d5d8c39)
+           (Objaverse uid 3ca7caa7f6e14bbb8c5e17381d5d8c39, glbs/000-119)
+  Licence: CC-BY 4.0 (annotation "by" + asset.extras.license CC-BY-4.0); Sketchfab page now CC0.
+  Credit line: "Spotline Sardine, Sardinops melanostictus" by ffish.asia / floraZia.com, CC-BY 4.0, modified.
+  Build: fishset.py sardine_src.glb sardine.glb 0.2 --fwd=-x --up=+z --keep-mats --straighten --tris=400 --base=512 --aux=512
+         --silver=0.4,0.6,0.7,0.28 --cage=0.01 --ray=0.03   (709k -> 392 tris)
+
+cutlassfish.glb - Largehead hairtail / cutlassfish (Trichiurus lepturus, Trichiuridae), photogrammetry scan of a real specimen.
+  1.20 m, 788 tris, textures 512 px, bright silver (metallic 0.8 / roughness 0.22 on the flanks).
+  Mouth: the scan's jaws were slightly apart (fangs showing); closed by rotating the lower jaw 5 deg up about the gape corner.
+  Title:   タチウオ Cutlassfish, Trichiurus lepturus
+  Author:  ffish.asia / floraZia.com (https://sketchfab.com/ffishAsia-and-floraZia)
+  Source:  https://sketchfab.com/3d-models/cutlassfish-trichiurus-lepturus-635d8716393c45fab94d641b374f82ff
+           (now https://sketchfab.com/3d-models/cc0-cutlassfish-trichiurus-lepturus-635d8716393c45fab94d641b374f82ff)
+           (Objaverse uid 635d8716393c45fab94d641b374f82ff, glbs/000-141)
+  Licence: CC-BY 4.0 (annotation "by" + asset.extras.license CC-BY-4.0); Sketchfab page now CC0.
+  Credit line: "Cutlassfish, Trichiurus lepturus" by ffish.asia / floraZia.com, CC-BY 4.0, modified.
+  Build: fishset.py cutlassfish_src.glb cutlassfish.glb 1.2 --fwd=-x --up=+z --keep-mats --straighten --tris=800 --base=512
+         --aux=512 --silver=0.35,0.55,0.8,0.22 --jaw=0.555,-0.012,0.596,-0.003,5 --cage=0.003 --ray=0.01
+         (1.19M -> 788 tris; bend 3.3 cm removed)
+
+lanternfish.glb - STAND-IN: Synagrops japonicus (Japanese splitfin, Acropomatidae), photogrammetry scan of a real specimen caught at
+  250 m in Suruga Bay. No realistic Myctophidae (true lanternfish) model exists in Objaverse 1.0; this is a small silvery
+  deep-water fish with a very large eye and a lanternfish-like body, used as the fallback (the only lanternfish-order scan,
+  Neoscopelus microchir, is already in raw9 and is pink with a gaping mouth). No photophores on this species.
+  0.09 m, 394 tris, textures 512 px. Mouth: lips slightly apart in the scan; lower jaw rotated 5 deg up (closed).
+  Title:   スミクイウオ？ Synagrops japonicus
+  Author:  ffish.asia / floraZia.com (https://sketchfab.com/ffishAsia-and-floraZia)
+  Source:  https://sketchfab.com/3d-models/synagrops-japonicus-c0a78ebabc3d4f98b2a7f17026318c91
+           (now https://sketchfab.com/3d-models/cc0-synagrops-japonicus-c0a78ebabc3d4f98b2a7f17026318c91)
+           (Objaverse uid c0a78ebabc3d4f98b2a7f17026318c91, glbs/000-037)
+  Licence: CC-BY 4.0 (annotation "by" + asset.extras.license CC-BY-4.0); Sketchfab page now CC0.
+  Credit line: "Synagrops japonicus" by ffish.asia / floraZia.com, CC-BY 4.0, modified.
+  Build: fishset.py lanternfish_src.glb lanternfish.glb 0.09 --fwd=-x --up=+z --keep-mats --straighten --tris=400 --base=512
+         --aux=512 --silver=0.45,0.65,0.6,0.3 --jaw=0.041,-0.0009,0.04537,0.00021,5 --cage=0.01 --ray=0.03   (328k -> 394 tris)
+
+hatchetfish.glb - STAND-IN: West Pacific luminous roughy (Aulotrachichthys prosthemius, Trachichthyidae), photogrammetry scan of a
+  real specimen caught at 250 m in Suruga Bay. No realistic Argyropelecus / Sternoptychidae model exists in Objaverse 1.0 (the only
+  "Hatchet Fish" is a 470-tri cartoon with a toothy grin). This is a small deep-bodied, big-eyed deep-sea fish with a ventral
+  light organ - the closest body plan available. Colour is the preserved specimen's brownish silver with a reddish head, NOT the
+  mirror-silver of a real hatchetfish (only ~8 % of texels qualify as silver, so it reads mostly dielectric).
+  0.07 m, 590 tris, textures 512 px. Mouth: lower jaw rotated 6 deg up (closed; the lips meet).
+  Title:   ハリダシエビス West Pacific Luminous Roughy
+  Author:  ffish.asia / floraZia.com (https://sketchfab.com/ffishAsia-and-floraZia)
+  Source:  https://sketchfab.com/3d-models/west-pacific-luminous-roughy-8c6ea62182a9433181d2bff1f39ef3cd
+           (now https://sketchfab.com/3d-models/cc0-aulotrachichthys-prosthemius-8c6ea62182a9433181d2bff1f39ef3cd)
+           (Objaverse uid 8c6ea62182a9433181d2bff1f39ef3cd, glbs/000-039)
+  Licence: CC-BY 4.0 (annotation "by" + asset.extras.license CC-BY-4.0); Sketchfab page now CC0.
+  Credit line: "West Pacific Luminous Roughy" by ffish.asia / floraZia.com, CC-BY 4.0, modified.
+  Build: fishset.py hatchetfish_src.glb hatchetfish.glb 0.07 --fwd=-x --up=+z --keep-mats --straighten --tris=600 --base=512
+         --aux=512 --silver=0.4,0.6,0.75,0.25 --jaw=0.032,-0.00074,0.03542,0.00016,6 --cage=0.01 --ray=0.03   (276k -> 590 tris)
+
+anglerfish.glb - Black seadevil-type deep-sea anglerfish (Melanocetus-like, Lophiiformes), hand-sculpted and painted model (not a
+  scan): globular head, huge open mouth with long fang teeth, illicium with a pale-teal esca (lure), lateral-line dots, dorsal and
+  pectoral fins; somewhat stylised (heavy brow over the eye). Mouth open (intended for the anglerfish).
+  0.90 m bbox length including the forward-arching lure; the body (lower jaw to tail) is ~0.80 m. 14,774 tris, textures 1024 px.
+  Title:   Anglerfish
+  Author:  Abby_Holzworth1 (https://sketchfab.com/Abby_Holzworth1)
+  Source:  https://sketchfab.com/3d-models/anglerfish-5e2f4b2d2e1a4613a008b6caaf40d50c
+           (Objaverse uid 5e2f4b2d2e1a4613a008b6caaf40d50c, glbs/000-036)
+  Licence: CC-BY 4.0 (annotation "by" + asset.extras.license CC-BY-4.0; Sketchfab page still "CC Attribution").
+  Credit line: "Anglerfish" by Abby_Holzworth1, CC-BY 4.0, modified.
+  Build: fishset.py anglerfish_src.glb anglerfish.glb 0.90 --fwd=-x --up=+z --keep-mats --tris=15000 --rough=0.3,0.5
+         --grade=0.35,0.6 --cage=0.0006 --ray=0.003   (84k -> 14,774 tris)
+  Modifications: rig/animation removed (first-frame pose frozen); an 80-face helper icosphere removed; the painted blue-marbled
+  base colour desaturated to 35 % and darkened to 60 % (near-black body, pale greyish teeth, dull teal lure); the source's
+  emissive map (lure / dots) is NOT carried over - make the lure glow in the game if wanted (it is the only teal-green part,
+  and it forms the front-most tip of the model, max +Z, upper half). Dark cavities behind the pectoral fins are the modelled gill
+  openings.
+
+tuna.glb - Pacific bluefin tuna, = assets/models/raw4/tuna.glb with the mouth CLOSED (2026-09-28). Everything else unchanged
+  (rig, skin, "Swim" clip, 3 materials, JPEG textures, 2.0 m, head +Z, up +Y, 28,418 tris).
+  Title:   クロマグロ Pacific Bluefin Tuna, Thunnus orientalis
+  Author:  ffish.asia / floraZia.com (https://sketchfab.com/ffishAsia-and-floraZia)
+  Source:  https://sketchfab.com/3d-models/pacific-bluefin-tuna-thunnus-orientalis-88d6e843abfb44d086341323e99b83ac
+           (now https://sketchfab.com/3d-models/cc0-pacific-bluefin-tuna-t-orientalis-88d6e843abfb44d086341323e99b83ac)
+           (Objaverse uid 88d6e843abfb44d086341323e99b83ac, glbs/000-053)
+  Licence: CC-BY 4.0 (Objaverse annotation "by"; see raw4/SOURCES.txt for the extras check); Sketchfab page now CC0.
+  Credit line: "Pacific Bluefin Tuna, Thunnus orientalis" by ffish.asia / floraZia.com, CC-BY 4.0, modified.
+  Modifications (in addition to raw4): mouth closed - the 2,348 lower-jaw vertices (below the line from the gape corner to the
+  gap between the jaws) rotated 27 deg up about the gape corner (glTF z 0.799, y -0.100), normals rotated with them; the GLB is
+  edited in place (positions, normals, accessor min/max only) by blender/tuna_mouth.py:
+  blender --background --factory-startup --python blender/tuna_mouth.py -- raw4/tuna.glb raw13/tuna.glb 0.799,-0.100,0.945,-0.0333,27
+
+<key>_src.glb     - unmodified source downloads (for re-running blender/fishset.py).
+<key>_preview.png - Blender Cycles (CPU) renders made for this project: side (left flank), 3/4 front (top row), top, untextured
+                    clay side showing the baked normal-map detail (bottom row); tuna: side, 3/4 front, head close-up, top
+                    (blender/glb_preview.py).
+PREVIEW.png       - contact sheet (blender/contact_sheet.py), 2 per row: kingfish, sardine / cutlassfish, lanternfish /
+                    hatchetfish, anglerfish / tuna.
+
+NOT DELIVERED (no acceptable CC0 / CC-BY model):
+  oarfish (Regalecus glesne) - no oarfish / Regalecus / リュウグウノツカイ / ribbonfish / king-of-herrings / crestfish model of any
+    kind exists in Objaverse 1.0 (the only matches are "sea serpent" fantasy sculpts and a boarfish).
+  goblin_shark (Mitsukurina owstoni) - only two exist: "Goblin Shark.zip" (canyutsai1, 778fd6de..., CC-BY, 18.8k tris) is a smooth
+    toy-like generic shark painted dark blue with a short pointed snout (goblin sharks are pinkish-white with a long blade snout);
+    "Goblin_Shark" (sassimedamine, 94b1136c..., CC-BY) is a 2.2M-tri untextured monster sculpt with an up-curved horn and
+    protruded gaping jaws. Neither meets the quality bar; the game keeps its current goblin shark.
+
+Search (2026-09-28): all 160 Objaverse 1.0 annotation shards, names + tags + descriptions, for kingfish / amberjack / yellowtail /
+Seriola / hiramasa / buri / kampachi, sardine / pilchard / clupeid / herring / anchovy / sprat / shad / イワシ / ニシン,
+hairtail / cutlassfish / Trichiurus / タチウオ / scabbardfish, lanternfish / Myctophidae / Diaphus / Benthosema / ハダカイワシ /
+photophore, hatchetfish / Argyropelecus / Sternoptychidae / Polyipnus / ムネエソ / bristlemouth, oarfish / Regalecus /
+リュウグウノツカイ / ribbonfish / Trachipterus / sea serpent, anglerfish / Lophiiformes / Melanocetus / Himantolophus / アンコウ,
+goblin shark / Mitsukurina / ミツクリザメ, plus generic "deep sea fish" tags.
+
+Candidates evaluated and rejected (Workbench / Cycles CPU previews):
+  Kingfish: Yellowtail Amberjack S. aureovittata (ffishAsia, 4930b725..., CC-BY) - closest species (split from S. lalandi) but the
+    mouth gapes wide; Five-ray Yellowtail second scan (72cb9cfd..., open mouth); Greater Amberjack (a8a9844f...); "Kingfish from
+    Poly by Google" (576-tri low poly, the model already in assets/models/raw).
+  Sardine: second Spotline Sardine scan (c62e1491..., duller texture), Big-eye Sardine Etrumeus (3020f73f...), Pacific Herring
+    (e36819a3...), Dotted Gizzard Shad (14d96a8c...) - all CC-BY scans, the chosen one has the cleanest silver texture;
+    "Herring" (amyscottmurray, flat 2D-ish), "Sardine" / "Sardine Swim" (dlp14c, lizongyong: 2k-tri low-poly).
+  Lanternfish: Shortfin Neoscopelid (3060eb2a..., already used in raw9; gaping mouth, pink); Deep-sea Smelt Glossanodon (be324f9f...,
+    slender smelt shape); "Lanternfish Lamp", "Fish-lantern", "Lantern And Fish" (props / art).
+  Hatchetfish: "Hatchet Fish" (starryeyedwisdom, 57bd8d53..., 470-tri cartoon with a toothy grin); unidentified deep-sea fish scans
+    (ffishAsia 06da67e2 / 24564d75 / 7fcce003 / 43ccc02c - protruding tube-like mouths / boarfish shapes).
+  Anglerfish: "Anglerfish" (Yapoco, ef6c07a0..., CC-BY in the annotation and extras, the most realistic sculpt) - REJECTED for
+    provenance: the model has been removed from Sketchfab, and the uploader account (Yapoco, formerly
+    alfredonicolasalarcon) consists largely of re-uploads of other people's / Paint 3D / cartoon-franchise content; "Anglerfish 3D" (Vipin Bhonde, f39c6c7b..., cartoon fangs);
+    "Anglerfish" (Kaasme, Jhibeki, annakal, BlastOffGames, ugs_in_ua "Melanocetus Johnsonii", blaflamme) - cartoon / untextured /
+    primitive; "Angler Fish, Lophius litulon" (ffishAsia, 6538a4e7..., CC-BY scan) - realistic but a flat benthic goosefish.

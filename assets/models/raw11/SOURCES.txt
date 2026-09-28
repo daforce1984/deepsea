@@ -1,0 +1,116 @@
+raw11 model sources: deep-water sharks + megalodon (compiled 2026-09-28). glTF 2.0 GLB with embedded PNG textures
+(base colour 1024 px, megalodon 2048 px; normal and ORM 1024 px). Metallic-roughness PBR, no Draco/KTX2, no extensions.
+Units: metres. Up: +Y. Head: +Z. Centred at the origin (bbox centre). Left side of the animal = +X. One mesh / one material each,
+double-sided. None of the models is rigged or animated: the game swims static meshes procedurally along +Z.
+Downloaded from the Objaverse mirror of Sketchfab CC-licensed models (https://huggingface.co/datasets/allenai/objaverse).
+The licence was checked twice: the Objaverse annotation "license" field (= "by") and the file's own glTF asset.extras.license
+("CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)").
+CC-BY 4.0 requires attribution in the game credits plus a note that the file was modified.
+
+Processing (all three): blender/deepsharks.py (a copy of blender/deepspecies.py with three additions:
+  --keep-mats  keeps mesh parts of every material and bakes each material's own colour (multi-atlas scans, eyes);
+  --debruise   desaturates reddish post-mortem bruising in the baked base colour towards the surrounding skin tone;
+  --samples=N  preview render samples.)
+  blender --background --factory-startup --python blender/deepsharks.py -- <key>_src.glb <key>.glb <length_m> [flags] [--preview=<png>]
+  (Blender 5.2, absolute output paths; bakes and previews with Cycles on the CPU only)
+  Common modifications: removed the colour-checker cube; joined the parts, welded seams, removed floating fragments; baked all
+  transforms; scaled to the stated length; head -> +Z, dorsal -> +Y; centred; decimated; new UV layout (smart UV project);
+  smooth normals; source colour re-baked onto the new UVs; tangent-space normal map baked from the full-resolution source
+  (clamped to <= 70 deg); AO baked into ORM.R; metallic 0, roughness 0.5-0.75 from texture luminance; double-sided.
+
+spurdog.glb - Shortspine spurdog (Squalus mitsukurii, Squalidae - a deep-water dogfish shark), photogrammetry scan of a real
+  specimen (Suruga Bay, Japan). Continental/insular shelves and upper slopes, mostly ~100-500 m, recorded to ~950 m.
+  1.0 m total length (species max ~1.1-1.25 m), 24,624 tris.
+  Title:   フトツノザメ Shortspine Spurdog, Squalus mitsukurii
+  Author:  ffish.asia / floraZia.com (https://sketchfab.com/ffishAsia-and-floraZia)
+  Source:  https://sketchfab.com/3d-models/shortspine-spurdog-squalus-mitsukurii-f33ff2ed27284322a9c456074745f6d0
+           (Objaverse uid f33ff2ed27284322a9c456074745f6d0, glbs/000-146)
+  Licence: CC-BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Credit line: "Shortspine Spurdog, Squalus mitsukurii" by ffish.asia / floraZia.com, CC-BY 4.0, modified.
+  Build: deepsharks.py spurdog_src.glb spurdog.glb 1.0 --fwd=+x --up=+z --straighten --keep-mats --debruise
+         (1.70M -> 24.6k tris; 3 texture atlases merged into one; lateral bend 2.8 cm removed; red post-mortem bruising around
+         the pectoral fins / gill area desaturated to skin tone, ~9 % of texels touched).
+
+swell_shark.glb - Blotchy swell shark, juvenile (Cephaloscyllium umbratile, Scyliorhinidae - catshark), photogrammetry scan of a
+  real specimen caught at 250 m depth in Suruga Bay, Japan (per the source description). Bottom-dwelling; ~50-250+ m on
+  shelves and upper slopes. Banded juvenile colour pattern. 0.40 m total length (juvenile; adults reach ~1.2 m), 24,624 tris.
+  Title:   ナヌカザメ Juv., Blotchy Swell Shark, C. umbratile
+  Author:  ffish.asia / floraZia.com (https://sketchfab.com/ffishAsia-and-floraZia)
+  Source:  https://sketchfab.com/3d-models/juv-blotchy-swell-shark-c-umbratile-830571b271784f37b88322c0fb16b6c1
+           (Objaverse uid 830571b271784f37b88322c0fb16b6c1, glbs/000-083)
+  Licence: CC-BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Credit line: "Juv., Blotchy Swell Shark, C. umbratile" by ffish.asia / floraZia.com, CC-BY 4.0, modified.
+  Build: deepsharks.py swell_shark_src.glb swell_shark.glb 0.40 --fwd=+x --up=+z --straighten --keep-mats (373k -> 24.6k tris)
+  Note: the specimen rested on its belly, so the body is somewhat flattened (0.084 m wide incl. pectorals x 0.051 m high);
+  best used resting on / gliding just above the sea floor.
+
+megalodon.glb - Megalodon (Otodus megalodon, extinct, Miocene-Pliocene), digital sculpt with a great-white-like body plan
+  (the usual reconstruction; no monster exaggerations): dark grey back, white belly, slightly open mouth with teeth.
+  Painted texture, not a scan. Scaled to 16 m total length (8.0 m pectoral span, 5.36 m tall incl. fins), 39,399 tris.
+  Depth: pelagic, surface to mesopelagic (fantasy placement only - the species is extinct).
+  Title:   Megalodon
+  Author:  phonlaphat (https://sketchfab.com/phonlaphat)
+  Source:  https://sketchfab.com/3d-models/megalodon-b40ed90b4be345ebb834b0fd98bb577b
+           (Objaverse uid b40ed90b4be345ebb834b0fd98bb577b, glbs/000-026)
+  Licence: CC-BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Credit line: "Megalodon" by phonlaphat, CC-BY 4.0, modified.
+  Build: deepsharks.py megalodon_src.glb megalodon.glb 16.0 --fwd=-x --up=+z --keep-mats --tris=40000 --base=2048
+         (1.16M -> 39.4k tris incl. the eyes; base colour texture x 0.43 factor baked in; separate glossy black eye material
+         baked into the base colour; source metallic 0.1 -> 0).
+
+<key>_src.glb     - unmodified source downloads (for re-running blender/deepsharks.py).
+<key>_preview.png - Blender Cycles (CPU) renders of <key>.glb made for this project: side (left flank), 3/4 front (top row),
+                    top, untextured clay side showing the baked normal-map detail (bottom row).
+
+Search (2026-09-28): all 160 Objaverse 1.0 annotation shards, names + tags + descriptions, for sixgill / six-gill / Hexanchus,
+sevengill / Notorynchus, cow shark, sleeper / Somniosus / Greenland shark, frilled / Chlamydoselachus, goblin / Mitsukurina,
+megamouth / Megachasma, lantern shark / Etmopterus, cookiecutter / Isistius, kitefin / Dalatias, gulper shark / Centrophorus,
+dogfish, catshark / Apristurus / Scyliorhinus, bramble / Echinorhinus, velvet belly, prickly shark, deep-sea shark, Deania,
+Galeus, Zameus, Centroscymnus, Squaliolus, Oxynotus, Pseudotriakis, Japanese names (ラブカ, カグラザメ, ミツクリザメ, オンデンザメ,
+ヨロイザメ, ダルマザメ, フジクジラ, カラスザメ, ...), megalodon / Otodus / Carcharocles.
+Result: no CC-BY / CC0 model of a frilled, sixgill, sevengill, sleeper/Greenland, goblin (realistic), megamouth, lantern,
+cookiecutter, kitefin, gulper, bramble, velvet-belly or prickly shark exists in Objaverse 1.0.
+
+Candidates evaluated and rejected (Workbench / Cycles CPU previews):
+  Kitefin (NHM_Imaging, 56cad567...) - CC-BY-NC-SA (not allowed), and only a micro-CT scan of the jaws.
+  Goblin Shark.zip (canyutsai1, 778fd6de...) / Goblin_Shark (sassimedamine, 94b1136c...) - see raw7 (cartoon / monster sculpt).
+  Melgacho, Scyliorhinus canicula (Toni_nw, df1aff74...) - CC-BY, but an underwater photogrammetry scene: the catshark is fused
+    into a large rock/sea-floor mesh; shelf species.
+  Blotchy Swell Shark adult male (ffishAsia-and-floraZia, 2df160f7...) - CC-BY, realistic scan; the juvenile (chosen) has the
+    documented 250 m capture depth and the cleaner texture.
+  Dog shark Mustelus griseus, Starspotted smooth-hound Mustelus manazo x2, Indonesian whaler, hammerhead, angelsharks
+    (ffishAsia-and-floraZia, MTSUichthyology) - CC-BY scans but shallow shelf species.
+  Spiny Dogfish (MTSUichthyology, b64b5c66...) - specimen curled into a C shape; Spinydogfish 50%scan (allysheehan) - jaw only.
+  Megalodon (sdpm, 4aff4c3d...) and Megalodon Animated (PoliteCat, 890d3c24...) - CC-BY on Sketchfab but both are re-uploads of
+    Microsoft's 3D Viewer / Paint 3D "Megalodon" asset (stated in the descriptions) - provenance of the licence doubtful.
+  Megalodon (FIELDFLY3R, 611a52a4...) - CC-BY, a whale in its bloody mouth, spec-gloss, stylised.
+  Otodus Megalodon x4 (canyutsai1, 66b493f6 / 7e65b8c5 / a6bca9ff / dd51127f) - CC-BY, rigged, but 3.7k-tri low-poly.
+  Megalodon (darumatech, dc53d026...) - CC-BY, rigged ("Take 001"), 6.8k tris, low-res game-style texture, no provenance info.
+  Megalodon Rex (geneugene), ARK Megalodon (Xenomorph636), Megalodon (Sea of Thieves), Megalodon vs Ship, Shadow Megalodon,
+    minecraft / blockbench megalodons - fantasy, game rips or toy-like.
+  Megalodon vs Great White Shark (canyutsai1) - CC-BY-SA (not allowed). Poisson - Otodus megalodon (sgfrance) - CC-BY-NC-SA.
+  Carcharocles megalodon PRI 55188 (CC0), Megalodon jaws / teeth models - fossils only.
+
+megalodon_rigged.glb (2026-09-28) - rigged + animated derivative of megalodon.glb above.
+  Credit line: "Megalodon" by phonlaphat, CC-BY 4.0, modified (rig, animation, teeth, mouth lining added for this project).
+  Build: blender/megalodon_rig.py megalodon.glb megalodon_rigged.glb --preview=megalodon_rigged_preview.png (Blender 5.2, CPU only)
+  Modifications:
+  - rotated 180 deg about up: head now at glTF +Z (snout z=+10), +Y up, bbox centred, scaled x1.25 to 20.0 m long.
+  - glTF UV-seam vertex splits merged; custom normals cleared (smooth shading).
+  - teeth: the sculpt has a real mouth pocket but no teeth. 157 serrated triangular teeth (front row, upper + lower jaw,
+    ~8 cm tall at the front tapering toward the gape corners, blade tips curled lingually, slanted distally) modelled
+    procedurally along lip margins found by ray casts through the gape. Material 'megalodon_teeth' (enamel white,
+    roughness 0.25, metallic 0).
+  - mouth: the pocket (palate/floor) faces -> material 'megalodon_mouth' (same base texture x dark red-pink factor,
+    roughness 0.45); two skinned cheek membranes added inside the lateral gape so the opened jaw shows a closed mouth
+    cavity (no see-through).
+  - skin material 'megalodon_skin': base colour 2048 + normal 1024 kept, ORM 1024 rebuilt (AO kept, roughness remapped to
+    0.55-0.70, metallic 0).
+  - armature: root, head, spine_01..04, tail_01, caudal_fin (spine chain), jaw (hinge near the gape corners), upper_jaw
+    (small protrusion), pectoral_L/R_root + _mid. Spine weights = bone-heat automatic weights (computed on a voxel-remeshed
+    proxy and transferred back); jaw / upper jaw / pectorals / teeth / membranes weighted explicitly.
+  - clips 'Swim' and 'Gape', 77 frames @ 24 fps (3.208 s), exact loops; identical body motion (travelling tail sweep,
+    head counter-yaw, pectoral trim); Gape adds a ~30 deg jaw opening + slow close, upper-jaw protrusion, pectorals lowering.
+  46.4k triangles (skin 33.7k, mouth 6.2k, teeth 6.6k).
+megalodon_rigged_preview.png - Cycles CPU renders of megalodon_rigged.glb: side (Swim), 3/4 front with jaw open (Gape),
+  top mid-sweep (Swim), front close-up of the open mouth (Gape).

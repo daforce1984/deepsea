@@ -1,0 +1,29 @@
+raw2 model sources (compiled 2026-09-26). All files: glTF 2.0 GLB, PNG/JPEG textures (1024 px), no Draco/KTX2.
+Coordinates: metres, +Y up, head/front faces +Z (glTF). Left side of the animal = +X.
+Downloaded from the Objaverse mirror of Sketchfab CC-licensed models (https://huggingface.co/datasets/allenai/objaverse);
+the licence was checked in each file's embedded Sketchfab asset metadata.
+CC-BY 4.0 requires attribution in credits plus a note that the files were modified.
+
+crab.glb  - Snow crab (Chionoecetes opilio), photogrammetry scan
+  Author: ffish.asia / floraZia.com (https://sketchfab.com/ffishAsia-and-floraZia)
+  Source: https://sketchfab.com/3d-models/snow-crab-chionoecetes-opilio-959f91a4aa9549e29d3f69019b9df593
+  Licence: CC-BY 4.0. Changes: colour-checker cube removed, decimated from 622k to 36k tris, unlit material changed to lit PBR,
+  scaled, re-posed (crouched), auto-rigged (39 bones), procedural Walk/Idle animations added.
+
+crab_b.glb - Segonzacia sp. (hydrothermal-vent crab), male, photogrammetry (RapidCompact-optimised)
+  Author: Thomas Flynn (https://sketchfab.com/nebulousflynn)
+  Source: https://sketchfab.com/3d-models/segozancia-sp-male-crab-rapidcompact-fdebdabc9fa24f518d19d1240ccba7a0
+  Licence: CC-BY 4.0. Changes: scaled, auto-rigged (39 bones), procedural Walk/Idle animations added.
+
+sea_turtle.glb - Kemp's ridley sea turtle, photogrammetry + artist rig and swim animation
+  Author: DigitalLife3D (https://sketchfab.com/DigitalLife3D)
+  Source: https://sketchfab.com/3d-models/model-51-kemps-ridley-sea-turtle-with-id-a0f6c4da88e644ac90c6f6a973ce11cc
+  Licence: CC-BY 4.0. Changes: painted research ID number ("132"/"135") inpainted out of the shell texture, scaled to 1.2 m,
+  rotated, spec/gloss material converted to metal/rough, action renamed "Swim".
+
+sea_turtle_b.glb - Hawksbill sea turtle (museum specimen), 3D scan, static
+  Author: Auckland Museum (https://sketchfab.com/aucklandmuseum)
+  Source: https://sketchfab.com/3d-models/hawksbill-sea-turtle-b7294b6b1ad64cc6b624f1185be8523e
+  Licence: CC-BY 4.0. Changes: tiny fragments removed, decimated from 220k to 36k tris, scaled to 0.95 m, rotated.
+
+*_preview.png - Blender Workbench renders of the files above (made for this project).

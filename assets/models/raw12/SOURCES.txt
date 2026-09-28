@@ -1,0 +1,64 @@
+raw12 model sources: giant manta (compiled 2026-09-28). glTF 2.0 GLB with embedded PNG textures (base colour 2048 px,
+normal + ORM 1024 px). Metallic-roughness PBR, no Draco/KTX2, no extensions. Units: metres. Up: +Y. Head (cephalic fins): +Z.
+Centred at the origin (bbox centre). Left side of the animal = +X. Wingspan (disc width) along X.
+Downloaded from the Objaverse mirror of Sketchfab CC-licensed models (https://huggingface.co/datasets/allenai/objaverse).
+The licence was checked twice: the Objaverse annotation "license" field (= "by") and the file's own glTF asset.extras.license
+("CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)").
+CC-BY 4.0 requires attribution in the game credits plus a note that the file was modified.
+
+manta.glb - Giant oceanic manta ray (Mobula birostris; hand-sculpted giant-manta anatomy: rolled/forward cephalic fins,
+  terminal mouth, eyes on the sides of the head, five pairs of ventral gill slits, small dorsal fin, pelvic fins, whip
+  tail). Recoloured to the oceanic-manta pattern: black back with two white shoulder patches, white belly with dark spots
+  concentrated on the abdomen, grey ventral wing margins. Replacement for raw/manta_ray.glb (Quaternius CC0 low-poly).
+  4.5 m wingspan (rest pose), 4.30 m long incl. tail, 37,430 tris, 22,011 vertices, one mesh / one material.
+  Rigged: 16 joints (root, spine_front, spine_rear, tail1-3, ceph_L/R, wing1-4_L/R), <= 4 weights per vertex.
+  Animation "Swim": exact loop, 97 samples, 0.0-4.0 s (0.25 Hz at speed 1; first and last keys identical), symmetric wing
+  beat with a travelling wave toward the tips, chord twist, slight body heave/pitch, trailing tail wave, cephalic-fin flutter.
+  The game's loader config P('manta_ray', { len: 4.5, fwd: '+z', anim: 'Swim', lenAxis: 0 }) fits this file unchanged
+  (frame-0 span = 4.47 m, i.e. 0.7 % under the rest span, so the game's frame-0 normalisation is within 1 %).
+  Title:   Manta Ray Swim
+  Author:  tferdin1 (https://sketchfab.com/tferdin1)
+  Source:  https://sketchfab.com/3d-models/manta-ray-swim-2f2892de34de4ed2b562c8194ca5f3f6
+           (Objaverse uid 2f2892de34de4ed2b562c8194ca5f3f6, glbs/000-136)
+  Licence: CC-BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Credit line: "Manta Ray Swim" by tferdin1, CC-BY 4.0, modified.
+  Build: blender --background --factory-startup --python blender/manta.py -- manta_src.glb manta.glb 4.5
+         [--preview=manta_preview.png] [--old=../raw/manta_ray.glb]   (Blender 5.2, absolute paths; Cycles on the CPU only)
+  Modifications (blender/manta.py):
+    - removed the source's 31-joint FBX rig and its clip (3.6 s, ~0.6 Hz, not an exact loop); kept the bind-pose mesh;
+    - baked all transforms; scaled from 241.5 source units to a 4.5 m wingspan; head -> +Z (source head was at glTF -Z;
+      verified from the geometry: the +Z end is the two-lobed cephalic-fin end, 0.69 m wide; the -Z end is the 1.7 cm
+      tail tip); dorsal -> +Y (verified: up-facing texels are the dark side); centred; welded coincident shell vertices;
+    - recoloured the saturated navy-blue / lavender paint to natural tones (luminance-mapped: black back, white belly);
+      darkened the painted light-blue sheen streaks and the pale crown on the back, keeping only the white shoulder patches;
+    - decimated symmetrically 88,624 -> 37,430 tris; new UV layout (smart UV project); smooth normals;
+    - baked from the full-resolution source (Cycles CPU): base colour 2048 px; tangent-space normal map 1024 px (source
+      geometry + a fine procedural skin grain); ambient occlusion into ORM.R; roughness 0.57-0.70 (mean 0.63; black back
+      a little rougher than the belly) in ORM.G; metallic 0; double-sided (top and bottom are open single-sheet shells);
+    - new 16-joint rig with smooth geometric weights (spanwise blend functions along each 4-bone wing chain, no wing
+      influence on the head; body split between front/rear spine, tail chain and cephalic fins);
+    - new exact-loop "Swim" clip (96 frames at 24 fps).
+
+manta_src.glb     - unmodified source download (input of blender/manta.py).
+manta_preview.png - Blender Cycles (CPU) renders of manta.glb made for this project, 640x360 panels, rows top to bottom:
+                    dorsal | ventral (head left); side (head left) | 3/4 front-top; Swim clip from the front: wings up
+                    (t = 1 s) | wings down (t = 3 s); head close-up from below-front (cephalic fins, mouth, eye, gill slits) |
+                    untextured clay 3/4 view (normal-map detail); comparison at the same 4.5 m span, dorsal view and 3/4
+                    view: the black textured model is the new manta.glb, the blue flat-shaded low-poly model is the old
+                    raw/manta_ray.glb.
+
+Candidates evaluated and rejected (all Objaverse 1.0 hits for manta / Mobula / devil ray; previews rendered in Blender):
+  Model 84A - Manta Ray Feeding (DigitalLife3D, 7dfe9256...) - science-based reconstruction of a real M. cf. birostris, rigged,
+    but the Objaverse annotation says "by" while the file's own asset.extras.license is CC-BY-NC-4.0 -> licence conflict.
+  Model 84C - Manta Ray Mesh Only (DigitalLife3D, 38fa168e...) - same licence conflict (file says CC-BY-NC-4.0); untextured.
+  Manta (Tasuku_Minoura, 17d7b1b8...) - CC-BY, natural colouring with shoulder patches, but a 1.8k-tri low-poly mesh posed
+    mid-flap, no rig.
+  Manta Ray Test (mikoala, 4987fe34...) - CC-BY, 6k tris, decorative teal tribal-ornament texture, clear-coat.
+  Rigged manta ray (138983, 7632eca5...) - CC-BY, 4.7k tris, untextured, simplified anatomy, no clip.
+  Manta Ray FIN (maragkoudaki, 22e42f68...) - CC-BY, 113k-tri rough untextured sculpt with holes, crumpled pose.
+  Giant Manta Ray (womblemonster) - cartoon-style diorama (per its description).
+  Low-Poly Mantaray (ben.lebreux), manta low poly (fabiotambone), Sting Ray (rkuhlf), Manta Ray (megan.favaro),
+    Manta ray (kinda) (Squidood), Manta (ArtisticGames) - low-poly / flat-shaded.
+  Manta Ray Monster (yimni), Dire_manta (iWertyni), Mantabu (several), Lorelai Devilray, Black Manta - fantasy / game characters.
+  Raie manta scene 1-3 (leelouperigault) - scene dioramas (manta leaving the water), not isolated creature models.
+  Eagle rays / skates / guitarfish scans (ffish.asia, MTSU ichthyology) - other batoid families, not mantas.

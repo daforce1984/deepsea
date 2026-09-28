@@ -1,0 +1,3 @@
+rosendal_plains_1_2k.hdr  — "Rosendal Plains 1", Poly Haven (photography Dimitrios Savva, processing Jarod Guest). License: CC0.
+                            https://polyhaven.com/a/rosendal_plains_1  (landscape on the horizon is removed at load: js/hdr.js removeGround)
+sky_2k.hdr                — "Kloofendal 48d Partly Cloudy (Pure Sky)", Poly Haven. License: CC0. (previous sky, unused)

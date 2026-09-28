@@ -1,0 +1,54 @@
+raw8 model sources (compiled 2026-09-28). glTF 2.0 GLB, embedded PNG textures (base colour 2048 px, normal + ORM 1024 px),
+metallic-roughness PBR, no Draco/KTX2, no extensions. Units: metres. Up: +Y. Forward (mantle tip / fins, direction of jet
+swimming): +Z; arms and the two feeding tentacles trail toward -Z. Centred at the origin (bbox centre). Left side of the animal = +X.
+Downloaded from the Objaverse mirror of Sketchfab CC-licensed models (https://huggingface.co/datasets/allenai/objaverse).
+The licence was checked twice: the Objaverse annotation "license" field (= "by") and the file's own glTF asset.extras.license
+("CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)").
+CC-BY 4.0 requires attribution in the game credits plus a note that the file was modified.
+
+squid.glb - Giant squid (Architeuthis dux) stand-in, built from a photogrammetry scan of a real Japanese flying squid
+  (Todarodes pacificus, Ommastrephidae). No realistic CC-BY/CC0 Architeuthis exists in Objaverse 1.0 (see rejected list), so the
+  closest realistic squid scan (same torpedo mantle / terminal fins / 8 arms + 2 tentacles body plan) was re-proportioned to a
+  giant squid: mantle 2.0 m, arms ~3.0 m, total length 10.0 m including the feeding tentacles.
+  Title:   スルメイカ Japanese Flying Squid, Todarodes pacificus
+  Author:  ffish.asia / floraZia.com (https://sketchfab.com/ffishAsia-and-floraZia)
+  Source:  https://sketchfab.com/3d-models/japanese-flying-squid-todarodes-pacificus-5f0688cb4ab64a398784118130987a15
+           (Objaverse uid 5f0688cb4ab64a398784118130987a15, glbs/000-033)
+  Licence: CC-BY 4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Credit line: "Japanese Flying Squid, Todarodes pacificus" by ffish.asia / floraZia.com, CC-BY 4.0, modified.
+  Modifications (blender/squid.py):
+    - removed the colour-checker cube; joined the 22 scan chunks, welded their seams (no floating debris found);
+    - unfolded the two feeding tentacles (scanned folded back in a U along the head and mantle): a centre line was fitted through
+      each tentacle and every vertex past the U-bend re-embedded along a line trailing behind the arms (cross-sections preserved);
+      tentacle stalks lengthened ~3.2-3.6x, clubs ~1.4x;
+    - arm crown stretched 2.57x along the body axis (arms ~3 m); fins narrowed laterally to 70 % (Architeuthis has small fins);
+      eyes enlarged 2x with a smooth radial falloff (dark eye ~16 cm across, eyeball region ~25 cm, as in Architeuthis);
+    - baked all transforms; scaled to mantle 2.0 m / total 10.0 m; mantle tip -> +Z, dorsal -> +Y; centred at the origin;
+    - decimated 1.51M -> 47.5k triangles; new UV layout (smart project on a smoothed copy, concave island packing); smooth normals;
+    - unlit scan textures (2 x 1024 px) re-baked onto the new UVs at 2048 px; tangent-space normal map (1024 px) baked from the
+      full-resolution deformed scan (normals clamped to <= 70 deg on the thin fins/arm membranes); ambient occlusion baked into ORM.R;
+    - metallic-roughness material: metallic 0, roughness 0.35-0.48 (mean 0.40, wet skin) derived from texture luminance,
+      double-sided (fins are single-sheet surfaces). No rig/animation (the game swims static meshes procedurally along +Z).
+  Landmarks (glTF coords, metres): mantle tip z = +5.01, mantle opening z ~ +3.0, eyes ~(+0.21, 0.04, 2.17) and (-0.12, 0.05, 2.18),
+    arm bases z ~ +1.9, arm tips z ~ -1.1, tentacle club tips z = -5.01. Bbox 0.94 x 0.50 x 10.02 m.
+  Colour: the specimen is a fresh-dead squid (reddish-brown dorsal mantle, pale head/arms; chromatophores partly relaxed).
+
+squid_src.glb     - unmodified source download (for re-running blender/squid.py:
+                    blender --background --factory-startup --python blender/squid.py -- squid_src.glb squid.glb [total_m] [mantle_m] [arms_m]).
+squid_preview.png - Blender Cycles (CPU) renders of squid.glb made for this project: side, top, 3/4 front, head close-up, arm crown,
+                    and an untextured clay render of the head showing the baked normal-map detail.
+
+Candidates evaluated and rejected (previews rendered in Blender, Workbench/Cycles CPU):
+  Swordtip Squid, Uroteuthis edulis (ffishAsia-and-floraZia, ff42bc83...) - CC-BY, excellent realistic scan (1.4M tris), runner-up;
+    rejected: a shallow-water loliginid with long rhomboid fins (less Architeuthis-like), tentacles also folded back.
+  Bigfin Reef Squid, Sepioteuthis lessoniana (ffishAsia-and-floraZia, 8457fc5f...) - CC-BY scan, but full-length cuttlefish-like fins.
+  Sculptjanuary 2019, day 1: Giant Squid (mvick13497, 1f97e079...) - CC-BY, 176k-tri sculpt, untextured, arms curled into a tangle.
+  Squid (chaitanyak, 8MzqmLdJVCjE...) - CC-BY "giant squid/kraken", author calls it anatomically inaccurate; stylised, fins missing.
+  Squid (morphinometr, 2e211c13...) - CC-BY sculpt, untextured (clearcoat only), stylised.
+  Giant Squid (oscartong, 62b115df...) - CC-BY, phone scan of a toy/brick model on a base.
+  Squid Textures (Scubarber, 0b52af0b...), Neon squid (Unicone, 179495b4...), Squid (gatotron, 1b271ec6...),
+    Calamaro, TwoSquid, night_squid_v8, Squid-Monster, SQUID 6 - CC-BY, cartoon/stylised/low-poly or sculpt studies.
+  Squid New / Squid New New / Squid Onlyblend / Squid (Parit.Treechadarat) - CC-BY with animation, but the glbs contain only a
+    textured sphere / a stylised rigged creature.
+  Bigfin Squid (andreasable, 47de872f...) - CC-BY, file contains only a water box. Kraken models - fantasy.
+  No CC-BY/CC0 realistic Architeuthis, Mesonychoteuthis or Dosidicus body model exists in Objaverse 1.0 (only a Dosidicus beak scan).

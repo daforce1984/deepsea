@@ -1,0 +1,6 @@
+[
+ {"name":"dolphin_click","query":"dolphin clicks","match":"^Dolphin Clicking$"},
+ {"name":"dolphin_chitter","query":"dolphin clicks","match":"^Dolphin Chittering$"},
+ {"name":"dolphin_noise","query":"dolphin clicks","match":"^Dolphin Noise-$"},
+ {"name":"dolphin_call","query":"dolphin clicks","match":"^Dolphin$"}
+]

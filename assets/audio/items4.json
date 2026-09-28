@@ -1,0 +1,7 @@
+[
+ {"name":"humpback_call","query":"humpback whale","match":"^Humpback Whale$"},
+ {"name":"humpback_song","query":"humpback whale","match":"^Whale Song$"},
+ {"name":"humpback_haunt","query":"humpback whale","match":"^Haunting Whale Song$"},
+ {"name":"humpback_dive","query":"whale song underwater","match":"^Diving with whales$"},
+ {"name":"humpback_baleines","query":"whale song underwater","match":"^Baleines$"}
+]
