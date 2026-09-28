@@ -15,14 +15,15 @@ export function initTouch({ cam, state, keys, clamp }) {
     <div id="tStick"><div class="ring"></div><div class="knob"></div></div>
     <div class="tcol" id="tRight">
       <button data-hold="KeyQ" class="dive">▲<small data-t="상승|Up"></small></button>
-      <button data-hold="KeyE" class="dive">▼<small data-t="하강|Down"></small></button>
-      <button data-hold="ShiftLeft" class="dive">≫<small data-t="부스트|Boost"></small></button>
+      <button data-toggle="KeyE" class="dive">▼<small data-t="하강|Down"></small></button>
+      <button data-toggle="ShiftLeft" class="dive">≫<small data-t="부스트|Boost"></small></button>
     </div>
     <div class="trow" id="tTop">
       <button data-key="KeyF" class="dive" data-t="손전등|Torch"></button>
       <button data-key="Space" class="dive" data-t="심도계|Gauge"></button>
       <button id="tMenuBtn">☰</button>
     </div>
+    <div id="tDepth" class="dive"></div>
     <button id="tEntry" data-key="Space" data-t="바다로 뛰어들기|Dive in"></button>
     <div id="tMenu">
       <button data-key="Enter" data-t="시네마틱 자동 하강|Cinematic auto descent"></button>
@@ -92,6 +93,11 @@ export function initTouch({ cam, state, keys, clamp }) {
     const off = (e) => { e.preventDefault(); keys[k] = false; b.classList.remove('down'); };
     b.addEventListener('touchstart', on, { passive: false }); b.addEventListener('touchend', off); b.addEventListener('touchcancel', off);
   }
+  // descend and boost latch: tap on, tap off (ascend is held, and cancels a latched descent)
+  const toggles = [...ui.querySelectorAll('button[data-toggle]')];
+  const setT = (b, v) => { keys[b.dataset.toggle] = v; b.classList.toggle('down', v); };
+  for (const b of toggles) b.addEventListener('touchstart', (e) => { e.preventDefault(); setT(b, !keys[b.dataset.toggle]); }, { passive: false });
+  ui.querySelector('[data-hold=KeyQ]').addEventListener('touchstart', () => setT(ui.querySelector('[data-toggle=KeyE]'), false));
   const menu = $('tMenu');
   for (const b of ui.querySelectorAll('button[data-key]')) {
     b.addEventListener('click', (e) => { e.stopPropagation(); press(b.dataset.key); if (menu.contains(b)) menu.classList.remove('on'); });
@@ -139,14 +145,18 @@ export function initTouch({ cam, state, keys, clamp }) {
   document.addEventListener('keydown', (e) => { if (e.code === 'KeyL') setTimeout(gyroLabel, 0); });
 
   // ---- mode-dependent visibility (boat: stick + dive-in button; diving: swim buttons) ----
-  let last = '';
+  let last = '', depthTxt = '';
+  const depthEl = $('tDepth');
   update.gyroStart = gyroStart;
   return update;
   function update() {
+    const depth = Math.max(0, -cam.pos[1]), dt = depth.toFixed(depth < 100 ? 1 : 0) + ' m';
+    if (dt !== depthTxt) { depthTxt = dt; depthEl.textContent = dt; }
     const m = (state.started ? 'on ' : '') + state.mode + (state.cine ? ' cine' : '') + (state.dbg ? ' dbg' : '');
     if (m === last) return; last = m;
     ui.className = m;
     if (state.cine && sid !== null) { sid = null; stick.classList.remove('on'); setMove(0, 0); }
+    if (state.cine || state.mode === 'boat') for (const b of toggles) setT(b, false);   // latched descent/boost end with the swim
   }
 }
 
@@ -170,6 +180,9 @@ export const TOUCH_CSS = `
   .trow button { border-radius: 18px !important; height: 36px; padding: 0 14px; font-size: 13px !important; }
   #tEntry { position: absolute; left: 50%; bottom: max(22px, env(safe-area-inset-bottom)); transform: translateX(-50%); border-radius: 26px !important; padding: 12px 30px; font-size: 16px !important; letter-spacing: .15em; display: none; }
   #touch.boat #tEntry { display: block; }
+  #tDepth { position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); font: 700 22px 'Rajdhani', sans-serif;
+    letter-spacing: .12em; color: #bff4ff; text-shadow: 0 0 10px rgba(60, 200, 255, .55), 0 1px 3px #000; pointer-events: none; }
+  #touch.cine #tDepth,
   #touch.boat .dive, #touch.cine .tcol, #touch.cine #tEntry { display: none; }
   #tMenu { position: absolute; right: 16px; top: 56px; display: none; flex-direction: column; gap: 6px; padding: 10px; background: rgba(0, 10, 18, .88); border: 1px solid rgba(127, 232, 255, .35); border-radius: 10px; }
   #tMenu.on { display: flex; }
