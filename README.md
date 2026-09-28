@@ -1,6 +1,7 @@
 # DEEPSEA — Abyssal Descent
 
-**Play:** https://daforce1984.github.io/deepsea/ (Chrome / Edge with WebGPU; phones supported)
+**Play:** https://daforce1984.github.io/deepsea/ (Chrome / Edge with WebGPU; phones supported)  
+**Source:** https://github.com/daforce1984/deepsea
 
 A photoreal first-person dive from a boat deck down to the 4,000 m abyssal plain, running on a custom
 WebGPU / WGSL engine written from scratch (no three.js, no game engine) — about 8,000 lines of JavaScript + WGSL.
@@ -9,7 +10,7 @@ Built with **Claude Opus 5.5** in Claude Code.
 ![Surface](docs/surface.png)
 
 ## Highlights
-- **Ocean:** FFT-style choppy waves, HDRI sky, GPU foam simulation (262k particles) that merges and tears,
+- **Ocean:** GPU FFT ocean (Tessendorf, 3 cascades × 256²), HDRI sky, GPU foam simulation (262k particles) that merges and tears,
   bubble plumes that rise and feed surface foam.
 - **Humpback lobtail:** spring-driven body bend, one tail slap over the fluke's real footprint,
   up to 400k spray drops simulated in a compute shader, drop-rain sound from real water-drop grains in an AudioWorklet.
