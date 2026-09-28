@@ -151,6 +151,8 @@ def main():
         print('front')
     elif cmd == 'call':
         # call <Domain.method> '<json params>' : raw CDP command on the test tab (never Target.* tab creation)
+        # NOTE: Emulation.* overrides outlive this process and can only be cleared from the same session —
+        # for device emulation, script set + test + clear inside one Session instead.
         if sys.argv[2].startswith('Target.'): raise SystemExit('Target.* not allowed')
         print(json.dumps(s.call(sys.argv[2], **(json.loads(sys.argv[3]) if len(sys.argv) > 3 else {})), ensure_ascii=False)[:2000])
     elif cmd == 'eval':
