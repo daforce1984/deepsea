@@ -138,7 +138,11 @@ export class Audio {
   }
   async init() {
     if (this.ctx) return;
-    const ctx = this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    let ctx;
+    const phone = matchMedia('(pointer: coarse)').matches;
+    try { ctx = new AC(phone ? { latencyHint: 'playback' } : {}); } catch (e) { ctx = new AC(); }   // phones: bigger buffers, fewer device start failures
+    this.ctx = ctx;
     this.master = ctx.createGain(); this.master.gain.value = 0.9;
     this.lp = ctx.createBiquadFilter(); this.lp.type = 'lowpass'; this.lp.frequency.value = 20000; this.lp.Q.value = 0.4;
     this.amb = ctx.createGain(); this.sfx = ctx.createGain();
@@ -183,9 +187,18 @@ export class Audio {
     } catch (e) { console.warn('drops worklet', e); }
     this.segs = [...this.segment('breath_mask'), ...this.segment('breath_scuba')];
     console.log('breath segments', this.segs.length);
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) ctx.suspend(); else if (!this.muted) ctx.resume();
-    });
+    // phones: the audio device can refuse to start (another app holds it, screen locked, call, backgrounded) —
+    // resume() then rejects with "Failed to start the audio device". Never let that escape; retry on the next touch/key.
+    document.addEventListener('visibilitychange', () => { if (document.hidden) ctx.suspend().catch(() => {}); else this.wake(); });
+    ctx.addEventListener?.('statechange', () => { if (ctx.state !== 'running' && !document.hidden) this.wake(); });
+    for (const ev of ['pointerdown', 'touchend', 'keydown']) document.addEventListener(ev, () => this.wake(), { capture: true, passive: true });
+    this.wake();
+  }
+  wake() {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state === 'running' || ctx.state === 'closed' || document.hidden || this.waking) return;
+    this.waking = true;
+    ctx.resume().catch((e) => console.warn('audio resume', e?.message || e)).finally(() => { this.waking = false; });
   }
   // ---- 3D sound: HRTF panner at a world position (distance loudness stays with the caller's vol: rolloff 0) ----
   setListener(pos, fwd, up) {

@@ -149,6 +149,10 @@ def main():
     elif cmd == 'front':
         s.call('Page.bringToFront')
         print('front')
+    elif cmd == 'call':
+        # call <Domain.method> '<json params>' : raw CDP command on the test tab (never Target.* tab creation)
+        if sys.argv[2].startswith('Target.'): raise SystemExit('Target.* not allowed')
+        print(json.dumps(s.call(sys.argv[2], **(json.loads(sys.argv[3]) if len(sys.argv) > 3 else {})), ensure_ascii=False)[:2000])
     elif cmd == 'eval':
         r = s.call('Runtime.evaluate', expression=sys.argv[2], awaitPromise=True, returnByValue=True)
         print(json.dumps(r.get('result', {}).get('value', r), ensure_ascii=False, indent=1))

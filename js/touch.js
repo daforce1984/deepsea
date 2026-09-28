@@ -28,13 +28,14 @@ export function initTouch({ cam, state, keys, clamp }) {
       <button data-key="Enter" data-t="시네마틱 자동 하강|Cinematic auto descent"></button>
       <button data-key="KeyV" data-t="자유 시점 토글|Toggle free look"></button>
       <button data-key="KeyB" data-t="호흡음 켜기/끄기|Breathing sound on/off"></button>
+      <button id="tGyro"></button>
       <button data-key="KeyM" data-t="음소거|Mute"></button>
       <button data-key="KeyL">English / 한국어</button>
       <button id="tFull" data-t="전체 화면|Fullscreen"></button>
       <button data-key="Backquote" data-t="디버그 (이벤트)|Debug (events)"></button>
       <button id="tClose" data-t="닫기|Close"></button>
     </div>
-    <div id="tRotate" data-t="가로 화면으로 돌려 주세요|Please rotate to landscape"></div>`;
+`;
   document.body.appendChild(ui);
 
   // ---- left stick: appears where the thumb lands in the lower-left half ----
@@ -48,7 +49,8 @@ export function initTouch({ cam, state, keys, clamp }) {
   const lookEl = $('tLook');
   lookEl.addEventListener('touchstart', (e) => {
     for (const t of e.changedTouches) {
-      if (sid === null && t.clientX < innerWidth * 0.45 && !state.cine) {
+      // stick: left part of the screen (portrait: lower-left only, the upper area stays free for looking)
+      if (sid === null && t.clientX < innerWidth * 0.45 && (innerWidth > innerHeight || t.clientY > innerHeight * 0.4) && !state.cine) {
         sid = t.identifier; sx = t.clientX; sy = t.clientY;
         stick.style.left = sx + 'px'; stick.style.top = sy + 'px'; stick.classList.add('on');
         knob.style.transform = 'translate(-50%,-50%)';
@@ -101,14 +103,51 @@ export function initTouch({ cam, state, keys, clamp }) {
     try { if (!document.fullscreenElement) document.documentElement.requestFullscreen?.({ navigationUI: 'hide' })?.catch?.(() => {}); else document.exitFullscreen?.(); } catch (e) {}
   });
 
+  // ---- gyroscope look: the phone's own rotation turns the view (deltas, so thumb-drag still works on top) ----
+  const gyro = { on: true, prev: null, granted: false };
+  const gyroLabel = () => { const b = $('tGyro'); b.dataset.t = gyro.on ? '자이로 끄기|Gyro look: ON' : '자이로 켜기|Gyro look: OFF'; const [ko, en] = b.dataset.t.split('|'); b.textContent = document.documentElement.lang === 'ko' ? ko : en; };
+  const onOri = (e) => {
+    if (!gyro.on || e.alpha == null || state.cine) { gyro.prev = null; return; }
+    const d2r = Math.PI / 180, o = (screen.orientation?.angle ?? window.orientation ?? 0) * d2r;
+    // device orientation → camera quaternion (W3C: ZXY intrinsic; as three.js DeviceOrientationControls)
+    const x = e.beta * d2r / 2, y = e.alpha * d2r / 2, z = -e.gamma * d2r / 2;
+    const c1 = Math.cos(x), c2 = Math.cos(y), c3 = Math.cos(z), s1 = Math.sin(x), s2 = Math.sin(y), s3 = Math.sin(z);
+    let q = [s1 * c2 * c3 + c1 * s2 * s3, c1 * s2 * c3 - s1 * c2 * s3, c1 * c2 * s3 - s1 * s2 * c3, c1 * c2 * c3 + s1 * s2 * s3];
+    const mul = (a, b) => [a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1], a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0], a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3], a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]];
+    q = mul(q, [-Math.SQRT1_2, 0, 0, Math.SQRT1_2]);            // camera looks out of the back of the screen
+    q = mul(q, [0, 0, Math.sin(-o / 2), Math.cos(-o / 2)]);     // screen rotation (portrait / landscape)
+    // forward = q · (0, 0, -1)
+    const [qx, qy, qz, qw] = q;
+    const f = [-(2 * (qx * qz + qw * qy)), -(2 * (qy * qz - qw * qx)), -(1 - 2 * (qx * qx + qy * qy))];
+    const yaw = Math.atan2(-f[0], -f[2]), pitch = Math.asin(clamp(f[1], -1, 1));
+    if (gyro.prev) {
+      let dy = yaw - gyro.prev[0]; dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI;
+      if (Math.abs(pitch) < 1.35) cam.yaw += dy;                  // yaw is undefined looking straight up/down
+      if (state.freeLook) cam.pitch = clamp(cam.pitch + (pitch - gyro.prev[1]), -1.45, 1.45);
+    }
+    gyro.prev = [yaw, pitch];
+  };
+  const gyroStart = () => {   // call from a tap (iOS asks for permission)
+    if (gyro.granted) return;
+    const go = () => { gyro.granted = true; addEventListener('deviceorientation', onOri); };
+    const DOE = window.DeviceOrientationEvent;
+    if (DOE && typeof DOE.requestPermission === 'function') DOE.requestPermission().then((r) => { if (r === 'granted') go(); else gyro.on = false, gyroLabel(); }).catch(() => { gyro.on = false; gyroLabel(); });
+    else if (DOE) go();
+  };
+  gyroLabel();
+  $('tGyro').addEventListener('click', (e) => { e.stopPropagation(); gyro.on = !gyro.on; gyro.prev = null; if (gyro.on) gyroStart(); gyroLabel(); menu.classList.remove('on'); });
+  document.addEventListener('keydown', (e) => { if (e.code === 'KeyL') setTimeout(gyroLabel, 0); });
+
   // ---- mode-dependent visibility (boat: stick + dive-in button; diving: swim buttons) ----
   let last = '';
-  return function update() {
+  update.gyroStart = gyroStart;
+  return update;
+  function update() {
     const m = (state.started ? 'on ' : '') + state.mode + (state.cine ? ' cine' : '') + (state.dbg ? ' dbg' : '');
     if (m === last) return; last = m;
     ui.className = m;
     if (state.cine && sid !== null) { sid = null; stick.classList.remove('on'); setMove(0, 0); }
-  };
+  }
 }
 
 export const TOUCH_CSS = `
@@ -135,8 +174,11 @@ export const TOUCH_CSS = `
   #tMenu { position: absolute; right: 16px; top: 56px; display: none; flex-direction: column; gap: 6px; padding: 10px; background: rgba(0, 10, 18, .88); border: 1px solid rgba(127, 232, 255, .35); border-radius: 10px; }
   #tMenu.on { display: flex; }
   #tMenu button { border-radius: 8px !important; padding: 9px 16px; font-size: 14px !important; text-align: left; }
-  #tRotate { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0, 0, 0, .85); color: #bff4ff; font-size: 16px; letter-spacing: .1em; pointer-events: auto; }
-  @media (orientation: portrait) { #tRotate { display: flex; } }
+  @media (orientation: portrait) {
+    .tcol { gap: 10px; } .tcol button { width: 56px; height: 56px; }
+    .trow { top: max(10px, env(safe-area-inset-top)); }
+    #start h1 { letter-spacing: .25em; }
+  }
   #dbg { z-index: 30; }
   @media (max-width: 900px) { #dbg { left: 8px; right: 8px; width: auto; top: 56px; max-height: 70vh; font-size: 11px; } }
   body.touch #look { top: 12px; }

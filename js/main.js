@@ -14,7 +14,10 @@ const Q = new URLSearchParams(location.search);
 const TORCH_RANGE = 65;   // m: beam march / shadow far plane
 const showErr = (e) => { const el = $('err'); el.style.display = 'block'; el.textContent += (e?.stack || e) + '\n'; console.error(e); };
 window.addEventListener('error', (e) => showErr(e.error || e.message));
-window.addEventListener('unhandledrejection', (e) => showErr(e.reason));
+window.addEventListener('unhandledrejection', (e) => {
+  if (/audio device|AudioContext|NotAllowedError/i.test(String(e.reason?.message || e.reason))) { console.warn('audio', e.reason); e.preventDefault(); return; }   // phones: audio retries on the next touch
+  showErr(e.reason);
+});
 
 // ---- water optics (Jerlov type I clear ocean; absorption a, scattering b, diffuse attenuation Kd) ----
 const ABSORB = [0.33, 0.052, 0.016];
@@ -74,10 +77,18 @@ async function boot() {
   if (Q.has('view')) return viewer(models[Q.get('view')]);
   if (Q.has('depth')) { state.mode = 'dive'; cam.pos = [0, -parseFloat(Q.get('depth')), 0]; state.fade = 1; }
   $('go').dataset.t = TOUCH ? '탭하여 시작|Tap to start' : '클릭하여 시작|Click to start';
-  if (TOUCH) $('startNote').dataset.t = '헤드폰 권장 · 가로 화면 · 왼쪽 엄지 이동 · 오른쪽 드래그 시점|Headphones recommended · landscape · left thumb to move · drag right side to look';
+  if (TOUCH) $('startNote').dataset.t = '헤드폰 권장 · 폰을 돌려 둘러보기 · 왼쪽 엄지 이동 · 드래그 시점|Headphones recommended · turn the phone to look around · left thumb to move · drag to look';
   applyLang(); $('go').classList.remove('wait');
   $('start').addEventListener('click', start);
   $('goFloor').classList.remove('wait');
+  $('goCine').classList.remove('wait');
+  $('goCine').addEventListener('click', (e) => {   // straight into the cinematic auto-descent (the Enter key path)
+    e.stopPropagation();
+    if (state.started) return;
+    start();
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Enter' }));
+    document.dispatchEvent(new KeyboardEvent('keyup', { code: 'Enter' }));
+  });
   $('goFloor').addEventListener('click', (e) => {
     e.stopPropagation();
     if (state.started) return;
@@ -91,6 +102,7 @@ async function boot() {
 }
 
 async function start() {
+  touchUpdate?.gyroStart();   // inside the tap: iOS only grants motion sensors from a user gesture
   if (!state.started) {
     state.started = true;
     $('start').style.opacity = 0; setTimeout(() => ($('start').style.display = 'none'), 900);
@@ -221,8 +233,9 @@ function tip(s, dur = 7) { $('tip').textContent = s; $('tip').style.opacity = s 
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   const cw = window.innerWidth * dpr, ch = window.innerHeight * dpr;
-  const maxH = parseInt(Q.get('h') || (TOUCH ? '600' : '900'));   // phones: fewer pixels for the mobile GPU   // higher internal resolution: finer edges (AA)
-  const s = Math.min(1, maxH / ch);
+  const maxH = parseInt(Q.get('h') || '900');   // higher internal resolution: finer edges (AA)
+  // phones: a pixel budget (~600p landscape) in either orientation, so portrait isn't starved to a 280 px wide image
+  const s = TOUCH && !Q.get('h') ? Math.min(1, Math.sqrt(1067 * 600 / (cw * ch))) : Math.min(1, maxH / ch);
   R.resize(Math.round(cw * s), Math.round(ch * s));
 }
 
@@ -593,7 +606,7 @@ function render({ cm, depth, under }) {
   const cmR = new Float64Array(cm); cmR[12] = cmR[13] = cmR[14] = 0;
   const view = m4.invert(cmR);
   const near = 0.03, far = 3000;
-  const proj = m4.persp(cam.fov, W / H, near, far);
+  const proj = m4.persp(cam.fovE || cam.fov, W / H, near, far);
   const vp = m4.mul(proj, view);
   const ivp = m4.invert(vp);
   // flashlight (from the torch in the right hand)
@@ -687,6 +700,8 @@ function tick(now) {
   next += step;
   if (now - next > 250) next = now + step;
   touchUpdate?.();
+  // portrait screens: widen the vertical FOV so the horizontal view stays ~55–60° instead of a narrow slit
+  { const asp = R.W / R.H || 1; cam.fovE = 2 * Math.atan(Math.tan(cam.fov / 2) * Math.max(1, 0.75 / asp)); }
   const t0 = performance.now();
   try {
     const u = update(1 / FPS);

@@ -890,7 +890,7 @@ export class World {
     // never switch flakes on/off in view: fade in just below the surface, continuous brightness curve with depth
     this.snow.count = depth > 0.05 ? this.snow.max : 0;
     this.snow.obj.data[15] = lerp(lerp(2.2, 0.8, smooth(5, 60, depth)), 1.6, smooth(110, 190, depth)) * smooth(0.1, 2.5, depth);
-    for (const f of this.fx) f.obj.data[7] = 1 / Math.tan(cam.fov / 2);
+    for (const f of this.fx) f.obj.data[7] = 1 / Math.tan((cam.fovE || cam.fov) / 2);
     this.sand.count = depth > FLOOR_DEPTH - 25 ? this.sand.max : 0;
     this.sand.obj.data[15] = 1.4 * smooth(FLOOR_DEPTH - 25, FLOOR_DEPTH - 12, depth);   // fade in, never pop
     this.updateBubbles(dt, t, P, cm, depth, state);

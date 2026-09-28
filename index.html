@@ -33,10 +33,14 @@
   #start .go2 { margin-top: 14px; padding: 9px 26px; border: 1px solid rgba(127, 232, 255, .3); letter-spacing: .25em; color: #8ccfe0; font-size: 13px; font-family: 'Noto Sans KR'; }
   #start .go2:hover, #start .go:hover { border-color: rgba(127, 232, 255, .9); color: #bff4ff; }
   #start .go2.wait { display: none; }
-  #start small { margin-top: 18px; color: #6aa; font-family: 'Noto Sans KR'; font-size: 12px; letter-spacing: .1em; }
+  #start small { padding: 0 16px; text-align: center; margin-top: 18px; color: #6aa; font-family: 'Noto Sans KR'; font-size: 12px; letter-spacing: .1em; }
   .lb { position: fixed; left: 0; right: 0; height: 0; background: #000; transition: height 1.6s ease; pointer-events: none; }
   .lb.t { top: 0; } .lb.b { bottom: 0; }
   body.cine .lb { height: calc((100vh - 100vw / 2.35) / 2); }
+  @media (orientation: portrait) {   /* phones held upright: no 2.35 letterbox, zone title fits the width */
+    body.cine .lb { height: 0; }
+    .zone { width: 92vw; } .zone b { font-size: 21px; letter-spacing: .2em; } .zone span { font-size: 12px; letter-spacing: .08em; }
+  }
   body.cine #keys, body.cine #perf { opacity: 0; transition: opacity 1s; }
   #err { position: fixed; left: 16px; top: 16px; right: 16px; color: #f88; font: 13px monospace; white-space: pre-wrap; display: none; background: rgba(0, 0, 0, .8); padding: 12px; }
   #dbg { position: fixed; top: 48px; right: 18px; width: 380px; max-height: 80vh; overflow: auto; background: rgba(0, 10, 18, .82); border: 1px solid rgba(127, 232, 255, .35);
@@ -69,6 +73,7 @@
   <p data-t="심해 4,000 m 하강|Descend 4,000 m into the deep"></p>
   <div class="go wait" id="go">LOADING…</div>
   <div class="go2 wait" id="goFloor" data-t="바닥에서 시작 · 4,000 m|Start on the floor · 4,000 m"></div>
+  <div class="go2 wait" id="goCine" data-t="시네마틱 시작 · 자동 하강|Start cinematic · auto descent"></div>
   <small id="startNote" data-t="헤드폰 권장 · 마우스로 시점 · 클릭하면 시작 · L 한국어/English|Headphones recommended · mouse to look · click to start · L English/한국어"></small>
 </div>
 <div id="err"></div>
