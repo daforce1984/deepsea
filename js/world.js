@@ -857,7 +857,7 @@ export class World {
         }
         const far = tgt ? v3.dist(a.sw.pos, tgt) : 0;
         a.sw.step(dt, tgt, far > 10 ? 1.4 : a.sp, 0.5, this.avoid(a.sw.pos, 0.6, 'ang' + this.anglers.indexOf(a), 2));
-        if (this.outOfSight(a.sw.pos, P, 2)) { a.sw.pos = null; a.c.visible = false; continue; }
+        if (this.outOfSight(a.sw.pos, P, 2, vis)) { a.sw.pos = null; a.c.visible = false; continue; }   // glow range: they spawn at vis + 5
         a.c.visible = true;
         const w = orient(a.sw.pos, a.sw.dir, 0.0);
         a.c.set(w, dt, 0.7);
@@ -1731,7 +1731,7 @@ export class World {
     add('jelly', tr('해파리 근접', 'Jellyfish close'), D > 420 && D < 1800, '', () => { this.evClose = 22; this.jellyPassT = 0; }, '420–1800 m', null);
     add('chicken', tr('머리 없는 닭 괴물', 'Headless chicken monster'), D > 450 && D < 2600, '', () => { const c = this.deepLife.chickens.find((q) => !q.p || this.outOfSight(q.p, P, 1)) || this.deepLife.chickens[0]; c.p = null; this.evClose = 15; }, '450–2600 m', () => nearest(this.deepLife.chickens, (x) => x.p));
     add('siph', tr('관해파리 사슬', 'Siphonophore chain'), D > 500 && D < 3200, '', () => { const S2 = this.deepLife.siphs.find((q) => !q.pos || this.outOfSight(q.pos, P, 8)) || this.deepLife.siphs[0]; S2.pos = null; this.evClose = 12; }, '500–3200 m', () => nearest(this.deepLife.siphs, (x) => x.pos));
-    add('angler', tr('아귀 근접', 'Anglerfish close'), D > 1100, '', () => { this.evClose = 24; this.anglerPassT = 0; }, tr('1100 m – 바닥', '1100 m – floor'), () => nearest(this.anglers, (x) => x.pos));
+    add('angler', tr('아귀 근접', 'Anglerfish close'), D > 1100, '', () => { this.evClose = 24; this.anglerPassT = 0; }, tr('1100 m – 바닥', '1100 m – floor'), () => nearest(this.anglers, (x) => x.sw?.pos));
     add('floor', tr('민태 통과 (바닥)', 'Grenadiers passing (floor)'), D > FD - 120, '', () => { this.evClose = 18; if (this.grenadiers?.[0]) this.grenadiers[0].passT = 0; }, tr('바닥 120 m 위부터', 'from 120 m above floor'), () => nearest(this.grenadiers, (x) => x.sw?.pos || x.pos));
     return L;
   }

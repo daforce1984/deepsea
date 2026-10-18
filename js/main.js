@@ -475,10 +475,11 @@ function update(dt) {
       director.pauseT -= dt;
       if (mood !== 'tension' && mood !== 'awe' && director.pauseT <= 0 && !director.pausing) { director.pausing = 9; director.pauseT = 40 + Math.random() * 30; }
       if (director.pausing > 0) { director.pausing -= dt; vy = 0.1; target = null; }
-      if (state.film) { const o = MOVIE.ctrl(d0, hAbove); if (o) { vy = o.vy; if (o.target) target = o.target; } }   // film: hold position and watch the encounter
+      const film = state.film ? MOVIE.ctrl(d0, hAbove) : null;   // film: hold position (or close in) and watch the encounter
+      if (film) { vy = film.vy; if (film.target) target = film.target; }
       vy *= smooth(2.5, 25, hAbove);
       const fwdH = [-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw)];
-      const want = v3.add([0, -vy, 0], v3.scale(fwdH, hAbove < 6 ? 0.8 : 0.25));
+      const want = film?.vel || v3.add([0, -vy, 0], v3.scale(fwdH, hAbove < 6 ? 0.8 : 0.25));
       cam.vel = v3.lerp(cam.vel, want, 1 - Math.exp(-dt * (mood === 'tension' ? 1.5 : 0.6)));
       // lens: tight + handheld in tension, wide in awe
       const fovT = (mood === 'tension' ? 60 : 72) * Math.PI / 180;   // no wide-angle in awe: it shrinks giants
@@ -729,11 +730,12 @@ function tick(now) {
 // OfflineAudioContext to the same instant, so picture and sound stay locked however slow the capture is.
 // Story: look around from the deck → dolphins → humpback breathing + lobtail → jump in → descend, stopping at every
 // encounter's depth and holding on the animal until it has played out → the abyssal floor.
-const FILM_EVENTS = [   // key, stop depth (m), min s, max s; live events end when the world reports them over
-  ['dolphinPlay', 6, 14, 32], ['manta', 14, 18, 55], ['bait', 20, 22, 45], ['whalePass', 32, 20, 60], ['shark', 60, 30, 30],
-  ['oar', 160, 20, 50], ['turtle', 200, 25, 70], ['mega', 300, 30, 60], ['jelly', 450, 18, 18], ['chicken', 500, 18, 18],
-  ['siph', 560, 22, 22], ['squid', 700, 30, 60], ['angler', 1150, 22, 22], ['floor', FLOOR_DEPTH - 100, 28, 28],
-];
+const FILM_EVENTS = [   // key, stop depth (m), min s, max s, view distance (m: the diver swims in and keeps the animal there —
+  // in the dark the torch only reaches ~15 m); live events end when the world reports them over
+  ['dolphinPlay', 6, 14, 32], ['manta', 14, 18, 55], ['bait', 20, 22, 45], ['whalePass', 32, 20, 60], ['shark', 60, 30, 30, 8],
+  ['oar', 160, 24, 50, 7], ['turtle', 200, 25, 70, 20], ['mega', 300, 30, 60, 14], ['jelly', 450, 18, 18], ['chicken', 500, 20, 20, 4],
+  ['siph', 560, 22, 22, 6], ['squid', 700, 30, 60, 10], ['angler', 1150, 24, 24, 3.5],
+];   // then the floor: grenadiers are cued once the diver has settled on the sediment (MOVIE 'end')
 const FILM_LIVE = new Set(['dolphinPlay', 'manta', 'bait', 'whalePass', 'oar', 'turtle', 'mega', 'squid']);
 const MOVIE = window.MOVIE = {
   ph: 'idle',
@@ -798,17 +800,30 @@ const MOVIE = window.MOVIE = {
         over = over || this.tail > 2.5;
       } else over = over || this.pt >= mn;
       if (over) { this.i++; this.ph = 'descend'; this.evKey = ''; this.target = null; }
-    } else if (this.ph === 'end') {
-      if (this.pt > 14) this.fade = Math.min(1, this.fade + dt / 3);
+    } else if (this.ph === 'end') {   // on the sediment: rattails forage past, then fade out
+      if (!this.evKey) this.cue('floor');
+      const e = this.entry('floor'); this.target = e?.pos || null;
+      if (this.pt > 28) this.fade = Math.min(1, this.fade + dt / 3);
       if (this.fade >= 1) this.ph = 'done';
     }
     $('filmFade').style.opacity = this.fade;
   },
   // consulted by the cinematic descent: hold still and watch while an encounter plays out; settle on the floor at the end
   ctrl(d0, hAbove) {
-    if (this.ph === 'event') return { vy: 0.04, target: this.target };
-    if (this.ph === 'floor' && hAbove < 4) { this.ph = 'end'; this.pt = 0; }
-    if (this.ph === 'end' || this.ph === 'done') return { vy: 0, target: null };
+    if (this.ph === 'event') {
+      const R = FILM_EVENTS[this.i]?.[4], p = this.target;
+      if (!R || !p || v3.dist(p, cam.pos) > 120) return { vy: 0.04, target: p && v3.dist(p, cam.pos) <= 120 ? p : null };   // never chase a stale / far-off position
+      // close in on the animal and hold it at the view distance (a calm thruster swim, never a dash)
+      const d = v3.sub(p, cam.pos), L = Math.max(v3.len(d), 1e-3), sp = clamp((L - R) * 0.3, -0.8, 3.5);
+      return { vy: 0.04, target: p, vel: v3.scale(d, sp / L) };
+    }
+    if (this.ph === 'floor' && hAbove < 6) { this.ph = 'end'; this.pt = 0; }   // the descent eases out ~5 m above the sediment
+    if (this.ph === 'end' || this.ph === 'done') {
+      const p = this.target;
+      if (!p || v3.dist(p, cam.pos) > 60) return { vy: 0, target: null, vel: [0, 0, 0] };
+      const d = v3.sub(p, cam.pos), L = Math.max(v3.len(d), 1e-3), sp = clamp((L - 5) * 0.3, -0.6, 1.5);
+      return { vy: 0, target: p, vel: v3.scale(d, sp / L) };
+    }
     return null;
   },
   async frame() {
