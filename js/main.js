@@ -846,10 +846,23 @@ const MOVIE = window.MOVIE = {
     const T = this.k / FPS;
     await this.susp; this.ctx.resume().catch(() => {});
     const buf = await this.done, n = Math.min(buf.length, Math.round(T * this.sr)), L = buf.getChannelData(0), Rc = buf.getChannelData(1);
+    // look-ahead peak limiter (ceiling 0.89, ~6 ms look-ahead, 300 ms release): the tail slap and the megalodon pass
+    // run well over full scale and would otherwise be hard-clipped
+    const B = 64, nb = Math.ceil(n / B), tg = new Float32Array(nb), ceil = 0.89;
+    let raw = 0;
+    for (let k = 0; k < nb; k++) { let m = 0; for (let i = k * B; i < Math.min(n, (k + 1) * B); i++) { const v = Math.max(Math.abs(L[i]), Math.abs(Rc[i])); if (v > m) m = v; } tg[k] = m > ceil ? ceil / m : 1; raw = Math.max(raw, m); }
+    const gs = new Float32Array(nb), rel = Math.exp(-B / (0.3 * this.sr));
+    for (let k = 0, cur = 1; k < nb; k++) {
+      let m = 1; for (let j = k; j <= Math.min(nb - 1, k + 4); j++) if (tg[j] < m) m = tg[j];
+      cur = m < cur ? m : 1 - (1 - cur) * rel; if (cur > m) cur = m; gs[k] = cur;
+    }
     const pcm = new Int16Array(n * 2);
-    for (let i = 0; i < n; i++) { pcm[2 * i] = clamp(L[i], -1, 1) * 32767; pcm[2 * i + 1] = clamp(Rc[i], -1, 1) * 32767; }
+    for (let i = 0; i < n; i++) {
+      const k = (i / B) | 0, k2 = Math.min(nb - 1, k + 1), g = gs[k] + (gs[k2] - gs[k]) * ((i % B) / B);
+      pcm[2 * i] = clamp(L[i] * g, -1, 1) * 32767; pcm[2 * i + 1] = clamp(Rc[i] * g, -1, 1) * 32767;
+    }
     this.pcm = new Uint8Array(pcm.buffer);
-    return { bytes: this.pcm.length, seconds: T, sr: this.sr, peak: Math.max(...[L, Rc].map((c) => { let m = 0; for (let i = 0; i < n; i += 7) m = Math.max(m, Math.abs(c[i])); return m; })) };
+    return { bytes: this.pcm.length, seconds: T, sr: this.sr, peak: raw };
   },
   chunk(i, size = 6 << 20) {
     const a = this.pcm.subarray(i * size, (i + 1) * size); let s = '';
