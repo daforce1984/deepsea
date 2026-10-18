@@ -1713,7 +1713,7 @@ export class World {
   eventCatalog(P, depth, t) {
     const D = depth, L = [], FD = FLOOR_DEPTH;
     // band: depths (m) where it can happen; pos(): where the animal is now (debug shows the approximate distance)
-    const add = (key, label, ok, eta, fn, band = '', pos = null) => { const p = pos && pos(); L.push({ key, label, ok, eta, fn, band, live: typeof eta === 'string' && eta.startsWith(RUN), min: key === 'floor' ? FD - 120 : parseFloat(band) || 0, dist: p ? v3.dist(p, P) : null }); };
+    const add = (key, label, ok, eta, fn, band = '', pos = null) => { const p = pos && pos(); L.push({ key, label, ok, eta, fn, band, pos: p || null, live: typeof eta === 'string' && eta.startsWith(RUN), min: key === 'floor' ? FD - 120 : parseFloat(band) || 0, dist: p ? v3.dist(p, P) : null }); };
     const nearest = (list, get) => { let b = null, bd = 1e9; for (const x of list || []) { const q = get(x); if (!q) continue; const dd = v3.dist(q, P); if (dd < bd) { bd = dd; b = q; } } return b; };
     const sw = this.swarm, w = this.whale, tu = this.turtle, sq = this.squid, mg = this.mega, oar = this.deepLife?.oar;
     const RUN = tr('진행 중', 'running');

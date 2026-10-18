@@ -350,8 +350,13 @@ function direct(dt, depth, under) {
   if (A.ctx) A.setMusicLevel(0.1);   // background music at 10%
   return director.mood;
 }
+// game-time timers (not setTimeout: the offline film render runs many times slower than real time)
+const timers = [];
+function later(sec, fn) { timers.push([state.t + sec, fn]); }
 function update(dt) {
   state.t += dt; state.frame++;
+  for (let i = timers.length - 1; i >= 0; i--) if (state.t >= timers[i][0]) { const f = timers[i][1]; timers.splice(i, 1); f(); }
+  if (showZone.until && state.t > showZone.until) { showZone.until = 0; $('zone').classList.remove('show'); }
   const t = state.t;
   const fwd = [-Math.sin(cam.yaw) * Math.cos(cam.pitch), Math.sin(cam.pitch), -Math.cos(cam.yaw) * Math.cos(cam.pitch)];
   const right = [Math.cos(cam.yaw), 0, -Math.sin(cam.yaw)];
@@ -399,7 +404,7 @@ function update(dt) {
         cam.pos = v3.add(cam.pos, v3.scale(cam.vel, dt));
         if (cam.pos[1] < 0.25 && !state.splashed) {
           state.splashed = true; state.flash = 1;
-          A.play('entry_splash', 1.1, { bus: 'helmet' }); setTimeout(() => A.play('entry_under', 0.9), 280);
+          A.play('entry_splash', 1.1, { bus: 'helmet' }); later(0.28, () => A.play('entry_under', 0.9));
           world.burst(cam.pos, 220);
         }
         if (cam.pos[1] < -2.2 || e > walkH + 7) { state.mode = 'dive'; state.entryHigh = null; tip(diveTip(), 9); }
@@ -421,7 +426,7 @@ function update(dt) {
       if (cam.pos[1] < 0.25 && !state.splashed) {
         state.splashed = true; state.flash = 1;
         A.play('entry_splash', 1.0, { bus: 'helmet' });                              // real surface impact (heard in air)
-        setTimeout(() => A.play('entry_under', 0.9), 280);                             // then the muffled rush of bubbles under water
+        later(0.28, () => A.play('entry_under', 0.9));                             // then the muffled rush of bubbles under water
         world.burst(cam.pos, 160);
       }
       if (cam.pos[1] < -2.2 || e > walk + 6) {
@@ -470,6 +475,7 @@ function update(dt) {
       director.pauseT -= dt;
       if (mood !== 'tension' && mood !== 'awe' && director.pauseT <= 0 && !director.pausing) { director.pausing = 9; director.pauseT = 40 + Math.random() * 30; }
       if (director.pausing > 0) { director.pausing -= dt; vy = 0.1; target = null; }
+      if (state.film) { const o = MOVIE.ctrl(d0, hAbove); if (o) { vy = o.vy; if (o.target) target = o.target; } }   // film: hold position and watch the encounter
       vy *= smooth(2.5, 25, hAbove);
       const fwdH = [-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw)];
       const want = v3.add([0, -vy, 0], v3.scale(fwdH, hAbove < 6 ? 0.8 : 0.25));
@@ -594,7 +600,7 @@ function update(dt) {
 
 function showZone(z) {
   const el = $('zone'); el.querySelector('b').textContent = z.name; el.querySelector('span').textContent = tr(z.sub, z.subEn);
-  el.classList.add('show'); clearTimeout(showZone.tm); showZone.tm = setTimeout(() => el.classList.remove('show'), 5200);
+  el.classList.add('show'); showZone.until = state.t + 5.2;   // hidden again by update() (game time: the film renderer runs slower than real time)
   if (A.ctx && state.zone > 0) A.play('sonar', 0.25, { bus: 'helmet' });
 }
 
@@ -694,6 +700,7 @@ function render({ cm, depth, under }) {
 let next = 0, fpsN = 0, fpsT = 0, fps = 0, cpuMs = 0;
 function tick(now) {
   requestAnimationFrame(tick);
+  if (state.film) return;   // offline film render: MOVIE.frame() advances the game
   const step = 1000 / FPS;
   if (!next) next = now;
   if (now < next - 6) return;
@@ -716,6 +723,125 @@ function tick(now) {
     window.GAME.stats = { fps, cpuMs, gpuMB: R.bytes / 1048576, heapMB: performance.memory ? performance.memory.usedJSHeapSize / 1048576 : 0 };
   }
 }
+
+// ---------------------------------------------------------------- film renderer (tools/film.py drives it over CDP)
+// Offline, frame-exact 24 fps: the rAF loop is parked, each MOVIE.frame() advances the game by 1/24 s, renders, and steps an
+// OfflineAudioContext to the same instant, so picture and sound stay locked however slow the capture is.
+// Story: look around from the deck → dolphins → humpback breathing + lobtail → jump in → descend, stopping at every
+// encounter's depth and holding on the animal until it has played out → the abyssal floor.
+const FILM_EVENTS = [   // key, stop depth (m), min s, max s; live events end when the world reports them over
+  ['dolphinPlay', 6, 14, 32], ['manta', 14, 18, 55], ['bait', 20, 22, 45], ['whalePass', 32, 20, 60], ['shark', 60, 30, 30],
+  ['oar', 160, 20, 50], ['turtle', 200, 25, 70], ['mega', 300, 30, 60], ['jelly', 450, 18, 18], ['chicken', 500, 18, 18],
+  ['siph', 560, 22, 22], ['squid', 700, 30, 60], ['angler', 1150, 22, 22], ['floor', FLOOR_DEPTH - 100, 28, 28],
+];
+const FILM_LIVE = new Set(['dolphinPlay', 'manta', 'bait', 'whalePass', 'oar', 'turtle', 'mega', 'squid']);
+const MOVIE = window.MOVIE = {
+  ph: 'idle',
+  async init({ seconds = 1320, sampleRate = 44100 } = {}) {
+    state.film = true;
+    document.body.classList.add('film', 'cine');   // letterboxed throughout, no HUD chrome
+    $('start').style.display = 'none';
+    this.sr = sampleRate; this.cap = seconds; this.k = 0;
+    this.ctx = new OfflineAudioContext(2, Math.ceil(seconds * sampleRate), sampleRate);
+    await A.init(this.ctx);
+    await start();
+    state.freeLook = true;
+    const W = world;
+    // the film cues every encounter itself, one at a time: park the world's own schedulers
+    W.squid.wait = W.mega.wait = W.turtle.wait = 1e9;
+    if (W.whale) W.whale.wait = 1e9;
+    W.sharks.forEach((sh) => { sh.timer = 1e9; });
+    if (W.deepLife?.oar) W.deepLife.oar.wait = 1e9;
+    this.ph = 'deck'; this.pt = 0; this.i = 0; this.y0 = cam.yaw; this.fade = 0;
+    return { ok: true, W: R.W, H: R.H };
+  },
+  entry(key) { return world.eventCatalog(cam.pos, Math.max(0, -cam.pos[1]), state.t).find((e) => e.key === key); },
+  cue(key) { const e = this.entry(key); if (e) e.fn(); this.evKey = key; this.seen = false; this.pt = 0; this.tail = 0; },
+  aim(p, k) {
+    const d = v3.sub(p, cam.pos), yw = Math.atan2(-d[0], -d[2]), pt = Math.atan2(d[1], Math.hypot(d[0], d[2]));
+    cam.yaw += Math.atan2(Math.sin(yw - cam.yaw), Math.cos(yw - cam.yaw)) * k;
+    cam.pitch += (clamp(pt, -0.55, 0.45) - cam.pitch) * k;
+  },
+  // runs before update(): scripted shots on the deck, event sequencing underwater
+  direct(dt) {
+    const W = world; this.pt += dt;
+    W.evT = 999;                                    // no random deep events in between
+    if (this.ph !== 'whale' && W.whale) W.showT = 999;
+    if (this.ph === 'deck') {                       // slow look around the sea from the dive deck
+      const u = smooth(0, 30, this.pt);
+      cam.yaw = this.y0 - 0.55 + 1.5 * u; cam.pitch = -0.05 + 0.04 * Math.sin(this.pt * 0.25);
+      if (this.pt > 3 && !this.dolph) { this.dolph = true; this.entry('dolphinJump')?.fn(); }
+      if (this.pt > 30) { this.ph = 'whale'; this.cue('whaleShow'); }
+    } else if (this.ph === 'whale') {               // humpback blows three times, raises the flukes and slams them down
+      const w = W.whale;
+      if (w?.sw?.pos) this.aim(w.sw.pos, 1 - Math.exp(-dt * 0.7));
+      if (w?.ev) this.seen = true;
+      if ((this.seen && !w?.ev) || this.pt > 130) this.tail += dt;
+      if (this.tail > 4 && this.pt > 25) { this.ph = 'entry'; this.pt = 0; beginEntry(); }
+    } else if (this.ph === 'entry') {
+      if (state.mode === 'dive' && this.pt > 4) {
+        state.cine = true; rig.init = false;
+        director.beats = Object.fromEntries(['bait', 'cutlass', 'whale', 'manta', 'cutlass2', 'shark', 'turtle', 'mega', 'jelly', 'squid', 'angler'].map((k) => [k, true]));
+        this.ph = 'descend';
+      }
+    } else if (this.ph === 'descend') {
+      const ev = FILM_EVENTS[this.i];
+      if (!ev) this.ph = 'floor';
+      else if (-cam.pos[1] >= ev[1]) { this.ph = 'event'; this.cue(ev[0]); }
+    } else if (this.ph === 'event') {
+      const [key, , mn, mx] = FILM_EVENTS[this.i], e = this.entry(key);
+      this.target = e?.pos || null;
+      let over = this.pt >= mx;
+      if (FILM_LIVE.has(key)) {
+        if (e?.live) this.seen = true;
+        if (this.pt >= mn && ((this.seen && !e?.live) || (!this.seen && this.pt > 15))) this.tail += dt;
+        over = over || this.tail > 2.5;
+      } else over = over || this.pt >= mn;
+      if (over) { this.i++; this.ph = 'descend'; this.evKey = ''; this.target = null; }
+    } else if (this.ph === 'end') {
+      if (this.pt > 14) this.fade = Math.min(1, this.fade + dt / 3);
+      if (this.fade >= 1) this.ph = 'done';
+    }
+    $('filmFade').style.opacity = this.fade;
+  },
+  // consulted by the cinematic descent: hold still and watch while an encounter plays out; settle on the floor at the end
+  ctrl(d0, hAbove) {
+    if (this.ph === 'event') return { vy: 0.04, target: this.target };
+    if (this.ph === 'floor' && hAbove < 4) { this.ph = 'end'; this.pt = 0; }
+    if (this.ph === 'end' || this.ph === 'done') return { vy: 0, target: null };
+    return null;
+  },
+  async frame() {
+    if (this.k > 0) await this.susp;               // audio has rendered up to this frame's instant
+    this.direct(1 / FPS);
+    { const asp = R.W / R.H || 1; cam.fovE = 2 * Math.atan(Math.tan(cam.fov / 2) * Math.max(1, 0.75 / asp)); }
+    render(update(1 / FPS));
+    this.k++;
+    if (this.k / FPS < this.cap - 0.5) {
+      this.susp = this.ctx.suspend(this.k / FPS);
+      if (this.k === 1) this.done = this.ctx.startRendering(); else this.ctx.resume();
+    }
+    await R.device.queue.onSubmittedWorkDone();
+    await Promise.race([new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))), new Promise((r) => setTimeout(r, 250))]);   // presented before the screenshot (rAF stalls if the window is hidden)
+    return { k: this.k, t: +(this.k / FPS).toFixed(2), depth: +(-cam.pos[1]).toFixed(1), ph: this.ph, ev: this.evKey || '', end: this.ph === 'done',
+      heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : 0, gpuMB: Math.round(R.bytes / 1048576) };
+  },
+  // render the remaining audio and hand it out as 16-bit stereo PCM in base64 chunks
+  async finish() {
+    const T = this.k / FPS;
+    await this.susp; this.ctx.resume().catch(() => {});
+    const buf = await this.done, n = Math.min(buf.length, Math.round(T * this.sr)), L = buf.getChannelData(0), Rc = buf.getChannelData(1);
+    const pcm = new Int16Array(n * 2);
+    for (let i = 0; i < n; i++) { pcm[2 * i] = clamp(L[i], -1, 1) * 32767; pcm[2 * i + 1] = clamp(Rc[i], -1, 1) * 32767; }
+    this.pcm = new Uint8Array(pcm.buffer);
+    return { bytes: this.pcm.length, seconds: T, sr: this.sr, peak: Math.max(...[L, Rc].map((c) => { let m = 0; for (let i = 0; i < n; i += 7) m = Math.max(m, Math.abs(c[i])); return m; })) };
+  },
+  chunk(i, size = 6 << 20) {
+    const a = this.pcm.subarray(i * size, (i + 1) * size); let s = '';
+    for (let j = 0; j < a.length; j += 0x8000) s += String.fromCharCode.apply(null, a.subarray(j, j + 0x8000));
+    return btoa(s);
+  },
+};
 
 // debug: advance frames synchronously (works while the window is hidden/minimised)
 window.GAME.step = async (n = 1) => {

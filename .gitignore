@@ -5,3 +5,4 @@ __pycache__/
 *.pyc
 *.log
 tools/.cdp_tab.json
+renders/

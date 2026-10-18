@@ -136,12 +136,16 @@ export class Audio {
     if (this.breathSrc && this.ctx) this.breathSrc.g.gain.cancelScheduledValues(this.ctx.currentTime), this.breathSrc.g.gain.setTargetAtTime(this.breathOn ? this.breathVol * 0.9 : 0, this.ctx.currentTime, 0.05);
     this.saveBreath();
   }
-  async init() {
+  // offline: an OfflineAudioContext stepped frame by frame by the film renderer (js/main.js MOVIE)
+  async init(offline = null) {
     if (this.ctx) return;
     const AC = window.AudioContext || window.webkitAudioContext;
-    let ctx;
-    const phone = matchMedia('(pointer: coarse)').matches;
-    try { ctx = new AC(phone ? { latencyHint: 'playback' } : {}); } catch (e) { ctx = new AC(); }   // phones: bigger buffers, fewer device start failures
+    let ctx = offline;
+    this.offline = !!offline;
+    if (!ctx) {
+      const phone = matchMedia('(pointer: coarse)').matches;
+      try { ctx = new AC(phone ? { latencyHint: 'playback' } : {}); } catch (e) { ctx = new AC(); }   // phones: bigger buffers, fewer device start failures
+    }
     this.ctx = ctx;
     this.master = ctx.createGain(); this.master.gain.value = 0.9;
     this.lp = ctx.createBiquadFilter(); this.lp.type = 'lowpass'; this.lp.frequency.value = 20000; this.lp.Q.value = 0.4;
@@ -189,6 +193,7 @@ export class Audio {
     console.log('breath segments', this.segs.length);
     // phones: the audio device can refuse to start (another app holds it, screen locked, call, backgrounded) —
     // resume() then rejects with "Failed to start the audio device". Never let that escape; retry on the next touch/key.
+    if (this.offline) return;   // the film renderer owns suspend/resume
     document.addEventListener('visibilitychange', () => { if (document.hidden) ctx.suspend().catch(() => {}); else this.wake(); });
     ctx.addEventListener?.('statechange', () => { if (ctx.state !== 'running' && !document.hidden) this.wake(); });
     for (const ev of ['pointerdown', 'touchend', 'keydown']) document.addEventListener(ev, () => this.wake(), { capture: true, passive: true });
@@ -290,8 +295,8 @@ export class Audio {
     return { set: (vol, pan, bright = 0.3) => { const t = ctx.currentTime; g.gain.setTargetAtTime(vol, t, 0.25); p.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), t, 0.3); lp.frequency.setTargetAtTime(120 + 700 * bright, t, 0.3); lfo.frequency.setTargetAtTime(0.3 + bright * 1.2, t, 0.5); } };
   }
   // streamed music cues (HTMLAudioElement → WebAudio) with crossfades; missing files are skipped quietly
-  music(name, fade = 3) {
-    if (!this.ctx || this.curMusic === name) return;
+  music(name, fade = 3, again = false) {
+    if (!this.ctx || (this.curMusic === name && !again)) return;
     this.curMusic = name;
     const now = this.ctx.currentTime;
     if (!this.musicBus) { this.musicBus = this.ctx.createGain(); this.musicBus.gain.value = 0.55; this.musicBus.connect(this.master); this.tracks = {}; }
@@ -301,6 +306,18 @@ export class Audio {
     }
     if (!name) return;
     let tr = this.tracks[name];
+    if (this.offline) {   // OfflineAudioContext has no media elements: decode the cue and loop it from a buffer
+      if (!tr) {
+        const g = this.ctx.createGain(); g.gain.value = 0; g.connect(this.musicBus);
+        tr = this.tracks[name] = { g, el: { pause: () => {} } };   // wall-clock timers don't match film time: faded-out loops just stay silent
+        fetch(`assets/music/${name}.mp3`).then((r) => r.arrayBuffer()).then((ab) => this.ctx.decodeAudioData(ab)).then((b) => { tr.buf = b; if (this.curMusic === name) this.music(name, fade, true); }).catch(() => { tr.bad = true; });
+      }
+      if (tr.bad || !tr.buf) return;
+      clearTimeout(tr.stopT);
+      if (!tr.src) { const s = this.ctx.createBufferSource(); s.buffer = tr.buf; s.loop = true; s.connect(tr.g); s.start(); tr.src = s; }
+      tr.g.gain.cancelScheduledValues(now); tr.g.gain.setTargetAtTime(1, now, fade / 3);
+      return;
+    }
     if (!tr) {
       const el = new window.Audio(`assets/music/${name}.mp3`); el.loop = true; el.preload = 'auto';
       el.onerror = () => { tr.bad = true; };
