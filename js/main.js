@@ -485,6 +485,11 @@ function update(dt) {
       const fovT = (mood === 'tension' ? 60 : 72) * Math.PI / 180;   // no wide-angle in awe: it shrinks giants
       cam.fov = lerp(cam.fov, fovT, 1 - Math.exp(-dt * (mood === 'tension' ? 1.2 : 0.4)));
       diverLook(dt, target, mood);
+      if (film?.target) {   // film: steer the body so the encounter sits near frame centre (the head alone turns too little)
+        const d = v3.sub(film.target, cam.pos), yw = Math.atan2(-d[0], -d[2]), pt = clamp(Math.atan2(d[1], Math.hypot(d[0], d[2])), -1.2, 1.0);
+        const k = 1 - Math.exp(-dt * 1.4), ey = Math.atan2(Math.sin(yw - cam.yaw), Math.cos(yw - cam.yaw)) * k, ep = (pt - cam.pitch) * k;
+        rig.by += ey; rig.hp += ep; cam.yaw += ey; cam.pitch = clamp(cam.pitch + ep, -1.4, 1.4);
+      }
       if (d0 > 150 && !state.torch) { state.torch = true; A.play('torch_click', 0.6, { bus: 'helmet' }); }
     } else cam.fov = lerp(cam.fov, 72 * Math.PI / 180, 1 - Math.exp(-dt * 2));
     const al = state.cine ? 0 : v3.len(acc);
@@ -733,7 +738,7 @@ function tick(now) {
 const FILM_EVENTS = [   // key, stop depth (m), min s, max s, view distance (m: the diver swims in and keeps the animal there —
   // in the dark the torch only reaches ~15 m); live events end when the world reports them over
   ['dolphinPlay', 6, 14, 32], ['manta', 14, 18, 55], ['bait', 20, 22, 45], ['whalePass', 32, 20, 60], ['shark', 60, 30, 30, 8],
-  ['oar', 160, 24, 50, 7], ['turtle', 200, 25, 70, 20], ['mega', 300, 30, 60, 14], ['jelly', 450, 18, 18], ['chicken', 500, 20, 20, 4],
+  ['oar', 160, 24, 50, 7], ['turtle', 200, 25, 70, 20], ['mega', 300, 30, 60, 14], ['jelly', 450, 18, 18], ['chicken', 500, 20, 20, 6],
   ['siph', 560, 22, 22, 6], ['squid', 700, 30, 60, 10], ['angler', 1150, 24, 24, 3.5],
 ];   // then the floor: grenadiers are cued once the diver has settled on the sediment (MOVIE 'end')
 const FILM_LIVE = new Set(['dolphinPlay', 'manta', 'bait', 'whalePass', 'oar', 'turtle', 'mega', 'squid']);
@@ -757,6 +762,14 @@ const MOVIE = window.MOVIE = {
     this.ph = 'deck'; this.pt = 0; this.i = 0; this.y0 = cam.yaw; this.fade = 0;
     return { ok: true, W: R.W, H: R.H };
   },
+  clearStage(key) {   // retire whatever big animal is still around so the next encounter can start
+    const W = world;
+    if (key !== 'shark') W.sharks.forEach((sh) => { sh.timer = 1e9; if (sh.mode === 'pass') sh.spawned = false; });
+    if (key !== 'turtle' && W.turtle.active) { W.turtle.active = false; W.turtle.wait = 1e9; }
+    if (key !== 'mega' && W.mega.active) { W.mega.active = false; W.mega.wait = 1e9; }
+    if (key !== 'squid' && W.squid.active) { W.squid.active = false; W.squid.wait = 1e9; }
+    const oar = W.deepLife?.oar; if (key !== 'oar' && oar?.pos) { oar.pos = null; oar.wait = 1e9; }
+  },
   entry(key) { return world.eventCatalog(cam.pos, Math.max(0, -cam.pos[1]), state.t).find((e) => e.key === key); },
   cue(key) { const e = this.entry(key); if (e) e.fn(); this.evKey = key; this.seen = false; this.pt = 0; this.tail = 0; },
   aim(p, k) {
@@ -768,6 +781,7 @@ const MOVIE = window.MOVIE = {
   direct(dt) {
     const W = world; this.pt += dt;
     W.evT = 999;                                    // no random deep events in between
+    W.filmNoShark = this.evKey !== 'shark';         // sharks don't keep re-passing (and holding the stage) outside their scene
     if (this.ph !== 'whale' && W.whale) W.showT = 999;
     if (this.ph === 'deck') {                       // slow look around the sea from the dive deck
       const u = smooth(0, 30, this.pt);
@@ -789,7 +803,12 @@ const MOVIE = window.MOVIE = {
     } else if (this.ph === 'descend') {
       const ev = FILM_EVENTS[this.i];
       if (!ev) this.ph = 'floor';
-      else if (-cam.pos[1] >= ev[1]) { this.ph = 'event'; this.cue(ev[0]); }
+      else if (-cam.pos[1] >= ev[1]) {
+        // one big animal at a time: let the previous one swim off (up to 20 s), then clear any straggler and cue
+        const busy = ['shark', 'oar', 'turtle', 'mega', 'squid'].includes(ev[0]) && W.stageBusy(ev[0]);
+        this.hold = busy && (this.hold || 0) < 20 ? (this.hold || 0) + dt : 0;
+        if (!this.hold) { this.clearStage(ev[0]); this.ph = 'event'; this.cue(ev[0]); }
+      }
     } else if (this.ph === 'event') {
       const [key, , mn, mx] = FILM_EVENTS[this.i], e = this.entry(key);
       this.target = e?.pos || null;
@@ -810,6 +829,7 @@ const MOVIE = window.MOVIE = {
   },
   // consulted by the cinematic descent: hold still and watch while an encounter plays out; settle on the floor at the end
   ctrl(d0, hAbove) {
+    if (this.ph === 'descend' && this.hold) return { vy: 0.04, target: null };
     if (this.ph === 'event') {
       const R = FILM_EVENTS[this.i]?.[4], p = this.target;
       if (!R || !p || v3.dist(p, cam.pos) > 120) return { vy: 0.04, target: p && v3.dist(p, cam.pos) <= 120 ? p : null };   // never chase a stale / far-off position
@@ -837,7 +857,7 @@ const MOVIE = window.MOVIE = {
       if (this.k === 1) this.done = this.ctx.startRendering(); else this.ctx.resume();
     }
     await R.device.queue.onSubmittedWorkDone();
-    await Promise.race([new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))), new Promise((r) => setTimeout(r, 250))]);   // presented before the screenshot (rAF stalls if the window is hidden)
+    if (!this.fast) await Promise.race([new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))), new Promise((r) => setTimeout(r, 250))]);   // presented before the screenshot (rAF stalls if the window is hidden)
     return { k: this.k, t: +(this.k / FPS).toFixed(2), depth: +(-cam.pos[1]).toFixed(1), ph: this.ph, ev: this.evKey || '', end: this.ph === 'done',
       heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : 0, gpuMB: Math.round(R.bytes / 1048576) };
   },

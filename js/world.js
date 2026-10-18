@@ -1858,7 +1858,7 @@ export class World {
         s.ang += dt * 1.0 / s.r;
         target = [P[0] + Math.cos(s.ang) * s.r, P[1] + s.dy + Math.sin(t * 0.2 + s.i) * 2, P[2] + Math.sin(s.ang) * s.r];
         speed = 1.1;
-        if (this.cineClose && s.timer > 6) s.timer = 6;
+        if (this.cineClose && s.timer > 6 && !this.filmNoShark) s.timer = 6;   // film: sharks only pass during their own scene
         if (s.timer <= 0 && !this.sharks.some((o) => o.mode === 'pass')) {
           // brush past the diver: come in from the side of view, cross close in front
           s.mode = 'pass'; s.passed = false;
