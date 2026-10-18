@@ -833,6 +833,13 @@ const MOVIE = window.MOVIE = {
     if (this.ph === 'event') {
       const R = FILM_EVENTS[this.i]?.[4], p = this.target;
       if (!R || !p || v3.dist(p, cam.pos) > 120) return { vy: 0.04, target: p && v3.dist(p, cam.pos) <= 120 ? p : null };   // never chase a stale / far-off position
+      // giants (megalodon, turtle) are filmed from beside their swim path so the torch lights the flank, not a dark head-on face
+      const key = FILM_EVENTS[this.i][0], fd = key === 'mega' ? world.mega.dir : key === 'turtle' ? world.turtle.dir : null;
+      if (fd) {
+        const perp = v3.norm([-fd[2], 0, fd[0]]), sg = Math.sign(v3.dot(v3.sub(cam.pos, p), perp)) || 1;
+        const g = v3.add(p, v3.scale(perp, sg * R)), dg = v3.sub(g, cam.pos), Lg = Math.max(v3.len(dg), 1e-3);
+        return { vy: 0.04, target: p, vel: v3.scale(dg, clamp(Lg * 0.35, 0, 3.5) / Lg) };
+      }
       // close in on the animal and hold it at the view distance (a calm thruster swim, never a dash)
       const d = v3.sub(p, cam.pos), L = Math.max(v3.len(d), 1e-3), sp = clamp((L - R) * 0.3, -0.8, 3.5);
       return { vy: 0.04, target: p, vel: v3.scale(d, sp / L) };
