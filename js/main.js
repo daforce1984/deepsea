@@ -738,8 +738,8 @@ function tick(now) {
 const FILM_EVENTS = [   // key, stop depth (m), min s, max s, view distance (m: the diver swims in and keeps the animal there —
   // in the dark the torch only reaches ~15 m); live events end when the world reports them over
   ['dolphinPlay', 6, 14, 32], ['manta', 14, 18, 55], ['bait', 20, 22, 45], ['whalePass', 32, 20, 60], ['shark', 60, 30, 30, 8],
-  ['oar', 160, 24, 50, 7], ['turtle', 200, 25, 70, 20], ['mega', 300, 30, 60, 14], ['jelly', 450, 18, 18], ['chicken', 500, 20, 20, 6],
-  ['siph', 560, 22, 22, 6], ['squid', 700, 30, 60, 10], ['angler', 1150, 24, 24, 3.5],
+  ['oar', 160, 24, 50, 5], ['turtle', 200, 25, 70, 20], ['mega', 300, 30, 60, 14], ['jelly', 450, 18, 18], ['chicken', 500, 20, 20, 1.3],
+  ['siph', 560, 22, 22, 6], ['squid', 700, 30, 60, 10], ['angler', 1150, 24, 24, 2],
 ];   // then the floor: grenadiers are cued once the diver has settled on the sediment (MOVIE 'end')
 const FILM_LIVE = new Set(['dolphinPlay', 'manta', 'bait', 'whalePass', 'oar', 'turtle', 'mega', 'squid']);
 const MOVIE = window.MOVIE = {
