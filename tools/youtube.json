@@ -1,0 +1,49 @@
+{
+ "longform": {
+  "file": "renders/deepsea_longform_24fps.mp4",
+  "title": "Realtime Deep Sea in the Browser — Made with AI (WebGPU, Claude Opus 5.5)",
+  "description": "A first-person dive from a boat deck down to the 4,000 m abyssal plain, running in real time in a web browser on a custom WebGPU engine: no game engine, no three.js.\nThe code, WGSL shaders, Blender model scripts, sound mix and this cinematic were built with AI, using Claude Code (Claude Opus 5.5) with a human director giving notes.\n\n▶ Play it in your browser (Chrome / Edge with WebGPU, PC or phone): https://daforce1984.github.io/deepsea/\n▶ Source code: https://github.com/daforce1984/deepsea\n\nThe game runs in real time (24 fps on a GTX 1060 3GB). This 1080p video was captured frame by frame from the same browser build, with its own in-engine audio.\n\nChapters\n0:00 Dive boat\n0:30 Humpback breathing & lobtail\n1:44 Dolphins\n2:22 Manta rays\n3:18 Bait ball & tuna\n4:12 Humpback close pass\n6:08 Sharks\n7:20 Oarfish\n9:26 Giant turtle\n11:38 Megalodon\n13:26 Jellyfish\n13:54 Headless chicken monster\n14:30 Siphonophore\n15:22 Giant squid\n17:58 Anglerfish\n20:42 Abyssal floor\n\nInside: GPU FFT ocean, 400k-drop whale-tail spray in a compute shader, merging/tearing foam, depth-correct light absorption, torch shadows, HRTF spatial audio.\n\n3D models (CC BY 4.0 unless noted, all modified: rescaled, retopologised, rigged or recoloured):\n\"2002 Grand Banks\" by BoatUS Foundation · \"Game-ready Humpback Whale\" by Allie2k · \"Bottlenose Dolphin\" by popcornbag · \"Manta Ray Swim\" by tferdin1 · \"Animated Swimming Great White Shark Loop\" by LasquetiSpice · \"Megalodon\" by phonlaphat · \"Sunfish / Poisson Lune\" by Batton · \"Tuna Fish\" by GoldenZtuff · \"Anglerfish\" by Abby_Holzworth1 · \"Giant Isopod\" by RISD Nature Lab · \"Gulper Eel\" by SpaceGolby · Kemp's ridley sea turtle by DigitalLife3D · Segonzacia crab by Thomas Flynn · Auckland Museum scan · fish, squid, shark and crab scans by ffish.asia / floraZia.com (Pacific Bluefin Tuna, Five-ray Yellowtail, Spotline Sardine, Cutlassfish, Synagrops japonicus, West Pacific Luminous Roughy, Amami Grenadier, Japanese Flying Squid, Shortspine Spurdog, Blotchy Swell Shark, Shortfin Neoscopelid, Chaunax abei, Greeneye, Oriental Searobin, Snow Crab)\nCC BY 3.0: sea turtle, kingfish, cabin cruiser by Poly by Google\nCC0: Quaternius low-poly fish & rocks · king crab scan: Smithsonian 3D Digitization · Hands: W3C WebXR Input Profiles (MIT)\nSky: \"Rosendal Plains 1\", Poly Haven (CC0)\nSound effects & ambience: Pixabay (Pixabay Content License) by Soumages, DRAGON-STUDIO, Creativenabeel02, Homemade_SFX, Youssefmizani, floraphonic, SoundShelfStudio, MagiaZ and others. Music: AI-generated.\nFull licence list: assets/**/SOURCES.txt in the repo.\n\nNon-commercial fan project made with AI tools.\n\n#WebGPU #ClaudeCode #AI #gamedev #deepsea",
+  "category": "20",
+  "tags": [
+   "WebGPU",
+   "WGSL",
+   "Claude",
+   "Claude Opus 5.5",
+   "Claude Code",
+   "AI coding",
+   "AI game",
+   "deep sea",
+   "ocean",
+   "megalodon",
+   "giant squid",
+   "humpback whale",
+   "real-time rendering",
+   "browser game",
+   "gamedev",
+   "javascript",
+   "underwater",
+   "4000m"
+  ]
+ },
+ "short60": {
+  "file": "renders/deepsea_short_60s.mp4",
+  "short": true,
+  "category": "20",
+  "title": "Realtime deep sea in the browser — made with AI 🌊 #Shorts",
+  "description": "Dive from the surface to the 4,000 m abyss in one minute: humpback tail slap, mantas, a bait ball, great white, oarfish, megalodon, giant squid, anglerfish.\nEverything runs in real time in a web browser on a custom WebGPU engine, built with AI (Claude Code / Claude Opus 5.5).\n\n▶ Full 21-minute dive: https://www.youtube.com/watch?v=bDdKgf036kY\n▶ Play it in your browser (Chrome/Edge, WebGPU): https://daforce1984.github.io/deepsea/\n▶ Source: https://github.com/daforce1984/deepsea\n\nMusic: the game's own AI-generated ambient cues. Sound effects: Pixabay (Pixabay Content License).\n3D models: CC BY 4.0 / CC BY 3.0 / CC0, credited in the full video and the repo (assets/**/SOURCES.txt).\n\n#Shorts #WebGPU #ClaudeCode #AI #deepsea #gamedev",
+  "tags": [
+   "Shorts",
+   "WebGPU",
+   "Claude",
+   "Claude Opus 5.5",
+   "Claude Code",
+   "AI",
+   "deep sea",
+   "megalodon",
+   "giant squid",
+   "ocean",
+   "browser game",
+   "gamedev"
+  ]
+ }
+}
